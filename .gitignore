@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+.envrc
+
+# IDE/editor
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files (never commit real secrets)
+.env
+.env.*
+
+# Runtime data and logs
+logs/
+src/data/bookings.json
+src/data/poster.json
+src/data/texts.json
+
+# Test/coverage caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+dist/
+build/

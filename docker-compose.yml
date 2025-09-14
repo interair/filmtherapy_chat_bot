@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  firestore:
+    image: gcr.io/google.com/cloudsdktool/cloud-sdk:emulators
+    container_name: firestore-emulator
+    command: ["gcloud", "beta", "emulators", "firestore", "start", "--host-port=0.0.0.0:8080", "--project=demo-project", "--quiet"]
+    ports:
+      - "8081:8080"  # host:container; access emulator UI/API on http://localhost:8081
+
+  bot:
+    build: .
+    container_name: gantich-chat-bot
+    restart: unless-stopped
+    depends_on:
+      - firestore
+    env_file:
+      - .env
+    environment:
+      # Point Google Firestore client to the local emulator
+      FIRESTORE_EMULATOR_HOST: firestore:8080
+      GOOGLE_CLOUD_PROJECT: demo-project
+    volumes:
+      # Persist logs written by logging.basicConfig in src/main.py
+      - ./logs:/app/logs
+      # Persist data files (we keep files locally, not in Firestore)
+      - ./src/data:/app/src/data
+    ports:
+      # Expose the simple web editor (if enabled via WEB_USERNAME/WEB_PASSWORD)
+      - "8080:8080"
+    # No ports needed for Telegram long polling, but 8080 is used for web editor.

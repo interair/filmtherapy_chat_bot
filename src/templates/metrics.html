@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Telegram Metrics{% endblock %}
+{% block content %}
+  <h1>📊 Telegram Metrics</h1>
+  <a href="/" class="button">← Back</a>
+
+  <div class="card">
+    <h2>Today</h2>
+    <p><strong>Date:</strong> {{ overview.date }}</p>
+    <p><strong>New users:</strong> {{ overview.new_users }}</p>
+    <p><strong>Active users:</strong> {{ overview.active_users }}</p>
+  </div>
+
+  <div class="card">
+    <h2>Daily users (last 14 days)</h2>
+    {% if daily and daily|length > 0 %}
+      <table style="width:100%; border-collapse: collapse;">
+        <tr>
+          <th style="text-align:left; padding: 6px; border-bottom: 1px solid #eee;">Date</th>
+          <th style="text-align:right; padding: 6px; border-bottom: 1px solid #eee;">New</th>
+          <th style="text-align:right; padding: 6px; border-bottom: 1px solid #eee;">Active</th>
+        </tr>
+        {% for d in daily %}
+        <tr>
+          <td style="padding: 6px; border-bottom: 1px solid #f2f2f2;">{{ d.date }}</td>
+          <td style="padding: 6px; border-bottom: 1px solid #f2f2f2; text-align:right;">{{ d.new_users }}</td>
+          <td style="padding: 6px; border-bottom: 1px solid #f2f2f2; text-align:right;">{{ d.active_users }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% else %}
+      <p style="color:#888;">No data yet</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Next-day retention (by cohort day)</h2>
+    {% if retention and retention|length > 0 %}
+      <table style="width:100%; border-collapse: collapse;">
+        <tr>
+          <th style="text-align:left; padding: 6px; border-bottom: 1px solid #eee;">Cohort Day</th>
+          <th style="text-align:right; padding: 6px; border-bottom: 1px solid #eee;">Retention</th>
+        </tr>
+        {% for day, rate in retention %}
+        <tr>
+          <td style="padding: 6px; border-bottom: 1px solid #f2f2f2;">{{ day }}</td>
+          <td style="padding: 6px; border-bottom: 1px solid #f2f2f2; text-align:right;">{{ rate }}%</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% else %}
+      <p style="color:#888;">No data yet</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Feature usage (last 14 days)</h2>
+    {% if features and features|length > 0 %}
+      <ul>
+        {% for k, v in features %}
+          <li><code>{{ k }}</code> — {{ v }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="color:#888;">No data yet</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>User demographics</h2>
+    {% if demographics and demographics.languages %}
+      <h3>Languages</h3>
+      <ul>
+        {% for lang, cnt in demographics.languages.items() %}
+          <li>{{ lang }} — {{ cnt }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="color:#888;">No data yet</p>
+    {% endif %}
+  </div>
+{% endblock %}

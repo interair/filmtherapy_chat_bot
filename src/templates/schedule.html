@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Schedule Settings{% endblock %}
+{% block content %}
+  <h1>🗓️ Schedule</h1>
+  <a href="/" class="button">← Back</a>
+  {% if saved %}<div class="alert">✓ Schedule saved</div>{% endif %}
+
+  <div class="card">
+    <form method="post" action="/schedule/save">
+      <p class="muted">Define recurrent availability. The bot will offer slots based on these rules and existing bookings.</p>
+
+      <table id="rulesTable">
+        <thead>
+          <tr>
+            <th style="width: 140px;">Weekday</th>
+            <th style="width: 110px;">Start</th>
+            <th style="width: 110px;">End</th>
+            <th style="width: 110px;">Duration</th>
+            <th style="width: 110px;">Interval</th>
+            <th>Location</th>
+            <th>Session type</th>
+            <th style="width: 60px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in rules %}
+          <tr class="rule-row">
+            <td>
+              <select name="weekday">
+                {% set wd = r.weekday if r.weekday is not none else r['weekday'] %}
+                {% for i,name in [(0,'Mon'),(1,'Tue'),(2,'Wed'),(3,'Thu'),(4,'Fri'),(5,'Sat'),(6,'Sun')] %}
+                  <option value="{{ i }}" {% if i == wd %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td><input type="time" name="start" value="{{ r.start if r.start is not none else r['start'] }}" required /></td>
+            <td><input type="time" name="end" value="{{ r.end if r.end is not none else r['end'] }}" required /></td>
+            <td><input type="number" name="duration" min="15" step="5" value="{{ r.duration if r.duration is not none else r['duration'] }}" /></td>
+            <td><input type="number" name="interval" min="15" step="5" value="{{ r.interval if r.interval is not none else r['interval'] }}" /></td>
+            <td>
+              {% set loc_val = r.location if r.location is not none else r['location'] %}
+              <select name="location">
+                <option value="" {% if not loc_val %}selected{% endif %}>— Any —</option>
+                {% for loc in locations %}
+                  <option value="{{ loc }}" {% if loc_val == loc %}selected{% endif %}>{{ loc }}</option>
+                {% endfor %}
+                {% if loc_val and loc_val not in locations %}
+                  <option value="{{ loc_val }}" selected>{{ loc_val }}</option>
+                {% endif %}
+              </select>
+            </td>
+            <td>
+              {% set sess_val = r.session_type if r.session_type is not none else r['session_type'] %}
+              <select name="session_type">
+                <option value="" {% if not sess_val %}selected{% endif %}>— Any —</option>
+                {% for st in session_types %}
+                  <option value="{{ st }}" {% if sess_val == st %}selected{% endif %}>{{ st }}</option>
+                {% endfor %}
+                {% if sess_val and sess_val not in session_types %}
+                  <option value="{{ sess_val }}" selected>{{ sess_val }}</option>
+                {% endif %}
+              </select>
+            </td>
+            <td><button type="button" class="button danger" onclick="removeRow(this)">✕</button></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+
+      <p>
+        <button type="button" class="button" onclick="addRule()">➕ Add rule</button>
+      </p>
+
+      <p>
+        <button type="submit" class="button success">💾 Save</button>
+        <a href="/" class="button">Cancel</a>
+      </p>
+    </form>
+  </div>
+
+  <template id="rowTemplate">
+    <tr class="rule-row">
+      <td>
+        <select name="weekday">
+          <option value="0">Mon</option>
+          <option value="1">Tue</option>
+          <option value="2">Wed</option>
+          <option value="3">Thu</option>
+          <option value="4">Fri</option>
+          <option value="5">Sat</option>
+          <option value="6">Sun</option>
+        </select>
+      </td>
+      <td><input type="time" name="start" value="10:00" required /></td>
+      <td><input type="time" name="end" value="18:00" required /></td>
+      <td><input type="number" name="duration" min="15" step="5" value="50" /></td>
+      <td><input type="number" name="interval" min="15" step="5" value="60" /></td>
+      <td>
+        <select name="location">
+          <option value="" selected>— Any —</option>
+          {% for loc in locations %}
+            <option value="{{ loc }}">{{ loc }}</option>
+          {% endfor %}
+        </select>
+      </td>
+      <td>
+        <select name="session_type">
+          <option value="" selected>— Any —</option>
+          {% for st in session_types %}
+            <option value="{{ st }}">{{ st }}</option>
+          {% endfor %}
+        </select>
+      </td>
+      <td><button type="button" class="button danger" onclick="removeRow(this)">✕</button></td>
+    </tr>
+  </template>
+
+  <script>
+    function addRule() {
+      const tpl = document.getElementById('rowTemplate');
+      const tbody = document.querySelector('#rulesTable tbody');
+      const node = document.importNode(tpl.content, true);
+      tbody.appendChild(node);
+    }
+    function removeRow(btn) {
+      const tr = btn.closest('tr');
+      if (tr) tr.remove();
+    }
+  </script>
+{% endblock %}

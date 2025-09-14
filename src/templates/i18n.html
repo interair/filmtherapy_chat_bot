@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Translations Editor{% endblock %}
+{% block content %}
+  <h1>🌐 Translations Editor (RU/EN)</h1>
+  <a href="/" class="button" title="Return to main dashboard">← Back to Admin</a>
+  {% if saved %}<div class="alert">✓ Translations saved</div>{% endif %}
+
+  <div class="card">
+    <p class="muted">Edit the texts users see in the bot. Tip: hover a field to see a hint.</p>
+    <form action="/i18n/save" method="post">
+      <table>
+        <tr><th>Key</th><th>RU</th><th>EN</th></tr>
+        {% for key in keys %}
+          <tr>
+            <td style="white-space:nowrap">{{ key }}</td>
+            <td>
+              {% set ru_val = ru.get(key, '') %}
+              {% if is_multiline(key, ru_val) %}
+                <textarea name="ru:{{ key }}" rows="3" cols="80" title="Russian translation for key {{ key }}">{{ ru_val }}</textarea>
+              {% else %}
+                <input type="text" name="ru:{{ key }}" size="80" value="{{ ru_val }}" title="Russian translation for key {{ key }}" />
+              {% endif %}
+            </td>
+            <td>
+              {% set en_val = en.get(key, '') %}
+              {% if is_multiline(key, en_val) %}
+                <textarea name="en:{{ key }}" rows="3" cols="80" title="English translation for key {{ key }}">{{ en_val }}</textarea>
+              {% else %}
+                <input type="text" name="en:{{ key }}" size="80" value="{{ en_val }}" title="English translation for key {{ key }}" />
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </table>
+      <p>
+        <button type="submit" class="button success" title="Save all translation changes">💾 Save translations</button>
+        <a href="/" class="button" title="Exit without saving">Cancel</a>
+      </p>
+    </form>
+  </div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{
+  "moods": [
+    {"title": "Весело", "code": "fun"},
+    {"title": "Грустно", "code": "sad"},
+    {"title": "Спокойно", "code": "calm"}
+  ],
+  "companies": [
+    {"title": "Один", "code": "solo"},
+    {"title": "Семья", "code": "family"},
+    {"title": "Друзья", "code": "friends"}
+  ],
+  "recs": {
+    "fun|solo": ["Ferris Bueller's Day Off", "The Grand Budapest Hotel"],
+    "fun|family": ["Paddington", "The Incredibles"],
+    "fun|friends": ["The Hangover", "Superbad"],
+
+    "sad|solo": ["Her", "Manchester by the Sea"],
+    "sad|family": ["Inside Out", "Coco"],
+    "sad|friends": ["The Green Mile", "The Shawshank Redemption"],
+
+    "calm|solo": ["Lost in Translation", "Before Sunrise"],
+    "calm|family": ["My Neighbor Totoro", "Finding Nemo"],
+    "calm|friends": ["Chef", "The Secret Life of Walter Mitty"]
+  }
+}

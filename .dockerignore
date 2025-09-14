@@ -1,0 +1,28 @@
+# Ignore VCS
+.git
+.gitignore
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.egg-info/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Local env
+.env
+.env.*
+
+# Runtime files (map as volumes if needed)
+logs/
+data/
+
+# Others
+.DS_Store

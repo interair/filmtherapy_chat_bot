@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Event Management{% endblock %}
+{% block content %}
+  <h1>🎬 Event Management</h1>
+  <a href="/" class="button" title="Return to main dashboard">← Back to Admin</a>
+  <a href="/events/add" class="button success" title="Create a new public event">➕ Add New Event</a>
+
+  <div class="card">
+    <h2>📅 Current Events</h2>
+    <p class="muted">Below is the list of events shown to users. Edit to correct details or delete to remove from the poster.</p>
+    {% if poster %}
+      {% for event in poster %}
+        <div class="event-item">
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            {% if event.photo %}
+              <img src="/static/{{ event.photo }}" alt="Event photo" style="width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid #ddd">
+            {% endif %}
+            <div>
+              <h4>{{ event.title }}</h4>
+              <p><strong>When:</strong> {{ event.when }}</p>
+              <p><strong>Place:</strong> {{ event.place }}</p>
+              <p><strong>Price:</strong> {{ event.price if event.price is not none else 'Free' }}</p>
+              <p><strong>ID:</strong> {{ event.id }}</p>
+              <a href="/events/edit/{{ event.id }}" class="button" title="Edit event details">✏️ Edit</a>
+              <a href="/events/delete/{{ event.id }}" class="button danger" title="Delete this event permanently" onclick="return confirm('Delete this event?')">🗑️ Delete</a>
+
+              {% if attendees is defined %}
+                {% set regs = attendees.get(event.id) or [] %}
+                <div style="margin-top:8px">
+                  <p><strong>Registered:</strong> {{ regs|length }}</p>
+                  {% if regs %}
+                    <ul>
+                      {% for r in regs %}
+                        <li>{{ r.get('user_name') or 'User' }} <small>(ID: {{ r.get('user_id') }})</small></li>
+                      {% endfor %}
+                    </ul>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>No events found. <a href="/events/add" class="button success" title="Create your first event">Add the first event</a></p>
+    {% endif %}
+  </div>
+{% endblock %}

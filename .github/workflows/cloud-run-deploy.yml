@@ -1,0 +1,166 @@
+name: Build and Deploy to Cloud Run (Artifact Registry)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*", "release-*" ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: build-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Repository variables (Settings → Secrets and variables → Actions → Variables)
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION || 'europe-west4' }}
+  CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'app-service' }}
+  WORKLOAD_IDENTITY_PROVIDER: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+  SERVICE_ACCOUNT_EMAIL: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
+  AR_REPOSITORY: ${{ vars.AR_REPOSITORY || 'bot-images' }}
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve configuration
+        id: cfg
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"      # e.g., owner/repo
+          REF_NAME="${{ github.ref_name }}"    # branch or tag name
+          TAG="${REF_NAME:-main}"
+
+          PROJECT="${GCP_PROJECT_ID}"
+          REGION="${GCP_REGION}"
+          SERVICE="${CLOUD_RUN_SERVICE}"
+
+          if [ -z "${PROJECT}" ]; then echo "::error::GCP_PROJECT_ID is not set"; exit 1; fi
+
+          AR_HOST="${REGION}-docker.pkg.dev"
+          AR_IMAGE="${AR_HOST}/${PROJECT}/${{ env.AR_REPOSITORY }}/${REPO}:${TAG}"
+
+          echo "project=${PROJECT}" >> "$GITHUB_OUTPUT"
+          echo "region=${REGION}" >> "$GITHUB_OUTPUT"
+          echo "service=${SERVICE}" >> "$GITHUB_OUTPUT"
+          echo "ar_host=${AR_HOST}" >> "$GITHUB_OUTPUT"
+          echo "ar_image=${AR_IMAGE}" >> "$GITHUB_OUTPUT"
+
+      # Authenticate to Google Cloud (WIF preferred)
+      - name: Auth via Workload Identity Federation
+        if: ${{ env.WORKLOAD_IDENTITY_PROVIDER != '' && env.SERVICE_ACCOUNT_EMAIL != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Auth via Service Account Key (fallback)
+        if: ${{ env.WORKLOAD_IDENTITY_PROVIDER == '' || env.SERVICE_ACCOUNT_EMAIL == '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Ensure required APIs (best-effort)
+        run: |
+          gcloud --project "${{ steps.cfg.outputs.project }}" services enable \
+            run.googleapis.com \
+            storage.googleapis.com \
+            iamcredentials.googleapis.com \
+            artifactregistry.googleapis.com || echo "Skipping: no permission to enable APIs"
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker "${{ steps.cfg.outputs.ar_host }}" --quiet
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image to Artifact Registry
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.cfg.outputs.ar_image }}
+          provenance: false
+
+      - name: Deploy to Cloud Run
+        env:
+          IMAGE_URI: ${{ steps.cfg.outputs.ar_image }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          WEB_USERNAME: ${{ secrets.WEB_USERNAME }}
+          WEB_PASSWORD: ${{ secrets.WEB_PASSWORD }}
+          ADMINS: ${{ vars.ADMINS }}
+          BASE_URL: ${{ vars.BASE_URL }}
+          USE_WEBHOOK: ${{ vars.USE_WEBHOOK }}
+        run: |
+          set -euo pipefail
+          PROJECT="${{ steps.cfg.outputs.project }}"
+          REGION="${{ steps.cfg.outputs.region }}"
+          SERVICE="${{ steps.cfg.outputs.service }}"
+
+          # Only pass essential app secrets; infra config is managed by Terraform
+          ENV_FILE="$(mktemp)"
+          : > "${ENV_FILE}"
+          if [ -n "${TELEGRAM_TOKEN:-}" ]; then
+            echo "TELEGRAM_TOKEN: \"${TELEGRAM_TOKEN}\"" >> "${ENV_FILE}"
+          fi
+          if [ -n "${ADMINS:-}" ]; then
+            echo "ADMINS: \"${ADMINS}\"" >> "${ENV_FILE}"
+          fi
+          if [ -n "${WEB_USERNAME:-}" ]; then
+            echo "WEB_USERNAME: \"${WEB_USERNAME}\"" >> "${ENV_FILE}"
+          fi
+          if [ -n "${WEB_PASSWORD:-}" ]; then
+            echo "WEB_PASSWORD: \"${WEB_PASSWORD}\"" >> "${ENV_FILE}"
+          fi
+          # Added: webhook-related variables from repo variables
+          if [ -n "${USE_WEBHOOK:-}" ]; then
+            echo "USE_WEBHOOK: \"${USE_WEBHOOK}\"" >> "${ENV_FILE}"
+          fi
+          if [ -n "${BASE_URL:-}" ]; then
+            echo "BASE_URL: \"${BASE_URL}\"" >> "${ENV_FILE}"
+          fi
+
+          gcloud run deploy "${SERVICE}" \
+            --project "${PROJECT}" \
+            --region "${REGION}" \
+            --platform managed \
+            --image "${IMAGE_URI}" \
+            --env-vars-file="${ENV_FILE}"
+
+          echo "Deployed ${SERVICE} in ${REGION} with image ${IMAGE_URI}"
+
+      - name: Set Telegram webhook
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          BASE_URL: ${{ vars.BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TELEGRAM_TOKEN:-}" ] || [ -z "${BASE_URL:-}" ]; then
+            echo "Skipping: TELEGRAM_TOKEN or BASE_URL not set"
+            exit 0
+          fi
+          URL="${BASE_URL%/}/tg/webhook"
+          echo "Setting webhook to ${URL}"
+          RESPONSE="$(curl -sS -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_TOKEN}/setWebhook" \
+            -d "url=${URL}")"
+          echo "${RESPONSE}"
+          echo "${RESPONSE}" | grep -q '"ok":true' || { echo "::error::Failed to set Telegram webhook"; exit 1; }

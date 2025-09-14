@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Locations{% endblock %}
+{% block content %}
+  <h1>📍 Locations</h1>
+  <a href="/" class="button">← Back</a>
+  <a href="/locations/types" class="button outline" style="margin-left:8px">Per-type mapping…</a>
+  {% if saved %}<div class="alert">✓ Сохранено</div>{% endif %}
+  {% if deleted %}<div class="alert">✓ Удалено</div>{% endif %}
+  <div class="card">
+    <h3>List</h3>
+    <ul style="list-style: none; padding-left: 0">
+      {% if items %}
+        {% for it in items %}
+          <li style="margin:6px 0">
+            {{ it.name }}
+            <a class="button danger" style="padding:2px 8px;font-size:12px" href="/locations/delete/{{ it.enc }}" onclick="return confirm('Удалить локацию?')">🗑️</a>
+          </li>
+        {% endfor %}
+      {% else %}
+        <li><em>Список пуст</em></li>
+      {% endif %}
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Add location</h3>
+    <form method="post" action="/locations/add">
+      <p><input type="text" name="name" placeholder="e.g., IJsbaanpad 9" required></p>
+      <p><button type="submit" class="button">➕ Add</button></p>
+    </form>
+  </div>
+{% endblock %}

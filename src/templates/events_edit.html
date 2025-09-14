@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Edit Event{% endblock %}
+{% block content %}
+  <h1>✏️ Edit Event</h1>
+  <a href="/events" class="button" title="Return to event list">← Back to Events</a>
+
+  <div class="card">
+    <form method="post" action="/events/save" enctype="multipart/form-data">
+      <input type="hidden" name="id" value="{{ event.id }}" />
+
+      <div class="form-group">
+        <label for="title">Event Title:</label>
+        <input type="text" id="title" name="title" required value="{{ event.title }}" title="Public name of the event shown to users">
+        <small class="muted">Keep it short and descriptive. Emojis are supported.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="when">Date & Time:</label>
+        <input type="datetime-local" id="when" name="when" required value="{{ when_value }}" title="Local date and time when the event starts">
+        <small class="muted">Adjust if the schedule has changed.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="place">Location:</label>
+        <input type="text" id="place" name="place" list="locs" required value="{{ event.place }}" title="Address or venue name where the event is held">
+        <datalist id="locs">
+          {% for s in locs %}<option value="{{ s }}">{% endfor %}
+        </datalist>
+        <small class="muted">Pick from suggestions or type a new address.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="price">Price:</label>
+        <input type="number" id="price" name="price" step="0.01" value="{{ event.price if event.price is not none else '' }}" title="Ticket price in your default currency">
+        <small class="muted">Leave empty for free events.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Description (optional):</label>
+        <textarea id="description" name="description" rows="4" title="Extra details users will see in the bot">{{ event.description or '' }}</textarea>
+        <small class="muted">Add speaker info, agenda, languages, or any special notes.</small>
+      </div>
+
+      <div class="form-group">
+        <label>Current Photo:</label>
+        {% if event.photo %}
+          <div style="margin:10px 0">
+            <img src="/static/{{ event.photo }}" alt="Event photo" style="max-width:300px;border-radius:8px;border:1px solid #ddd">
+          </div>
+        {% else %}
+          <p class="muted">No photo uploaded yet.</p>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <label for="photo">Replace Photo (optional):</label>
+        <input type="file" id="photo" name="photo" accept="image/*" title="Upload a new image to show in the bot and web">
+        <small class="muted">Accepted: JPG, PNG, WEBP. Up to 10 MB.</small>
+      </div>
+
+      <button type="submit" class="button success" title="Save changes to this event">💾 Update Event</button>
+      <a href="/events" class="button" title="Discard changes and go back">Cancel</a>
+    </form>
+  </div>
+{% endblock %}

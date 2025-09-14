@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Bot Admin Panel{% endblock %}
+{% block content %}
+  <h1>🤖 Bot Admin Panel</h1>
+  {% if saved %}<div class="alert">✓ Changes saved!</div>{% endif %}
+  {% if deleted %}<div class="alert">✓ Event deleted!</div>{% endif %}
+  {% if added %}<div class="alert">✓ Event added!</div>{% endif %}
+  {% if updated %}<div class="alert">✓ Event updated!</div>{% endif %}
+  {% if new_bookings_today and new_bookings_today > 0 %}<div class="alert">🔔 New bookings today: <strong>{{ new_bookings_today }}</strong> — <a href="/bookings" class="button" title="See all recent bookings">View</a></div>{% endif %}
+
+  <div class="card">
+    <h2>📋 Quick Actions</h2>
+    <p class="muted" style="margin-bottom:8px">Use these shortcuts to jump directly to common tasks. Hover any button to learn more.</p>
+    <a href="/events" class="button success" title="Create, edit, or remove public events">🎬 Manage Events</a>
+    <a href="/quiz" class="button" title="Manage onboarding quiz questions and answers">🧩 Manage Quiz</a>
+    <a href="/bookings" class="button" title="See all registrations and manage attendance">📅 View Bookings</a>
+    <a href="/system" class="button {{ 'success' if bot_running else 'danger' }}" title="System Info details — Bot is {{ 'running' if bot_running else 'stopped' }}" aria-label="System Info">ℹ️ System Info</a>
+  </div>
+
+
+  <div class="card">
+    <h2>📊 Telegram Metrics (Today)</h2>
+    <p><strong>New users:</strong> {{ metrics_overview.new_users if metrics_overview else 0 }}</p>
+    <p><strong>Active users:</strong> {{ metrics_overview.active_users if metrics_overview else 0 }}</p>
+    <h3>Top features (7 days)</h3>
+    {% if top_features and top_features|length > 0 %}
+      <ul>
+        {% for k, v in top_features %}
+          <li>{{ k }} — {{ v }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="color:#888;">No data yet</p>
+    {% endif %}
+    <p><a class="button" href="/metrics" title="See detailed dashboards and trends">Open full metrics →</a></p>
+  </div>
+{% endblock %}

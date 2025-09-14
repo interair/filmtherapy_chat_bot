@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Manage Quiz{% endblock %}
+{% block content %}
+  <h1>🧩 Manage Quiz</h1>
+  <a href="/" class="button">← Back to Admin</a>
+
+  <form method="post" action="/quiz/save">
+    <div class="card">
+      <h3>Options</h3>
+      <p>Enter one per line as: Title|code</p>
+      <label>Moods:</label>
+      <textarea name="moods" rows="5">{{ moods_text }}</textarea>
+      <label>Companies:</label>
+      <textarea name="companies" rows="5">{{ companies_text }}</textarea>
+    </div>
+
+    <div class="card">
+      <h3>Recommendations by pair</h3>
+      <p>One film per line for each Mood × Company</p>
+      {% if moods and companies %}
+        <table>
+          {% for m in moods %}
+            <tr>
+              {% for c in companies %}
+                {% set pair_key = m.code ~ '|' ~ c.code %}
+                <td>
+                  <div>
+                    <small>{{ m.title }} × {{ c.title }}</small><br>
+                    <textarea name="rec:{{ pair_key }}" rows="3" cols="30">{% if recs.get(pair_key) %}{{ recs.get(pair_key)|join('\n') }}{% endif %}</textarea>
+                  </div>
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </table>
+      {% else %}
+        <p>Add moods and companies to configure recommendations.</p>
+      {% endif %}
+    </div>
+
+    <p><button class="button success" type="submit">💾 Save</button></p>
+  </form>
+{% endblock %}

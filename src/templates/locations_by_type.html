@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Locations by Type{% endblock %}
+{% block content %}
+  <h1>📍 Locations by Type</h1>
+  <a href="/" class="button">← Back</a>
+  <a href="/locations" class="button outline" style="margin-left:8px">All locations…</a>
+  {% if saved %}<div class="alert">✓ Сохранено</div>{% endif %}
+  {% if deleted %}<div class="alert">✓ Удалено</div>{% endif %}
+
+  <div class="card">
+    <h3>Add mapping</h3>
+    <form method="post" action="/locations/types/add">
+      <div style="display:flex; gap:12px; flex-wrap: wrap; align-items: center;">
+        <select name="type" required style="min-width:260px">
+          {% for st in session_types %}
+            <option value="{{ st }}">{{ st }}</option>
+          {% endfor %}
+        </select>
+        <select name="name" required style="min-width:260px">
+          <option value="" disabled selected>Select location</option>
+          {% for loc in all_locations %}
+            <option value="{{ loc }}">{{ loc }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="button">➕ Add</button>
+      </div>
+    </form>
+  </div>
+
+  {% if items and items|length > 0 %}
+    {% for group in items %}
+      <div class="card">
+        <h3 style="margin-bottom:8px">{{ group.type }}</h3>
+        {% if group.locs and group.locs|length > 0 %}
+          <ul style="list-style:none; padding-left:0;">
+            {% for it in group.locs %}
+              <li style="margin:6px 0">
+                {{ it.name }}
+                <a class="button danger" style="padding:2px 8px;font-size:12px" href="/locations/types/delete/{{ group.type_enc }}/{{ it.enc }}" onclick="return confirm('Удалить связь?')">🗑️</a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted">No locations yet</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="card"><em>Нет настроек — добавьте первую связь</em></div>
+  {% endif %}
+{% endblock %}

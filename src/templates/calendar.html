@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Calendar Settings{% endblock %}
+{% block content %}
+  <h1>🗓️ Google Calendar</h1>
+  <a href="/" class="button">← Back</a>
+  {% if saved %}<div class="alert">✓ Settings saved</div>{% endif %}
+
+  <div class="card">
+    <form method="post" action="/calendar/save">
+      <div class="form-group">
+        <label title="Turn on to sync events with your Google Calendar">
+          <input type="checkbox" name="enabled" {% if enabled %}checked{% endif %} /> Enable Google Calendar integration
+        </label>
+        <small class="muted">When enabled, new bookings will be added to your calendar automatically.</small>
+      </div>
+      
+      <div class="form-group">
+        <label for="calendar_id">Calendar ID</label>
+        <input id="calendar_id" type="text" name="calendar_id" value="{{ calendar_id }}" placeholder="your_calendar_id@group.calendar.google.com" title="ID of the calendar to use (from Google Calendar settings)" />
+        <details style="margin-top: 10px;">
+          <summary style="cursor: pointer; color: #666; font-size: 14px;">📋 How to get Calendar ID</summary>
+          <div style="background: #f8f9fa; padding: 15px; margin-top: 10px; border-radius: 5px; font-size: 14px; line-height: 1.5;">
+            <ol>
+              <li>Go to <a href="https://calendar.google.com" target="_blank" rel="noopener">Google Calendar</a></li>
+              <li>In the left sidebar, find your calendar and click the <strong>three dots (⋮)</strong> next to it</li>
+              <li>Select <strong>"Settings and sharing"</strong></li>
+              <li>Scroll down to <strong>"Calendar ID"</strong> section</li>
+              <li>Copy the Calendar ID (usually ends with <code>@group.calendar.google.com</code> or <code>@gmail.com</code>)</li>
+            </ol>
+            <p><strong>Note:</strong> For your primary calendar, the ID is usually your Gmail address.</p>
+          </div>
+        </details>
+      </div>
+
+      <div class="form-group">
+        <div class="alert" style="background: #eef6ff; border-color: #cde3ff; color: #1e40af">
+          ℹ️ Service Account настроен автоматически через инфраструктуру. Укажите только Calendar ID и включите интеграцию.
+        </div>
+      </div>
+
+      <p>
+        <button type="submit" class="button success" title="Save calendar settings">💾 Save</button>
+        <a href="/" class="button" title="Discard changes and go back">Cancel</a>
+      </p>
+    </form>
+  </div>
+  
+  <div class="card" style="margin-top: 20px;">
+    <h3>📝 What happens when enabled?</h3>
+    <ul style="margin-left: 20px;">
+      <li>All new bookings will be created as events in your Google Calendar</li>
+      <li>Existing bookings will be synchronized with calendar events</li>
+      <li>Calendar events can be viewed and managed in Google Calendar</li>
+      <li>The system will check for scheduling conflicts using your calendar</li>
+    </ul>
+    
+    <h3>🔧 Troubleshooting</h3>
+    <ul style="margin-left: 20px;">
+      <li><strong>Invalid Service Account JSON:</strong> Make sure you copied the entire JSON file content</li>
+      <li><strong>Permission errors:</strong> Ensure the service account email is shared with your calendar</li>
+      <li><strong>Calendar not found:</strong> Verify the Calendar ID is correct</li>
+      <li><strong>API errors:</strong> Check that Google Calendar API is enabled in your Google Cloud project</li>
+    </ul>
+  </div>
+{% endblock %}

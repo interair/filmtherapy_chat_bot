@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}System Info{% endblock %}
+{% block content %}
+  <h1>ℹ️ System Information</h1>
+  <a href="/" class="button" title="Back to dashboard">← Back</a>
+
+  <div class="card">
+    <h2>Overview</h2>
+    <p class="muted">Details about the current admin panel session and bot runtime.</p>
+    <p title="Shows whether the Telegram bot process is up"><strong>Bot Status:</strong> {{ bot_status }}</p>
+    <p title="How the bot receives updates (webhook or polling)"><strong>Bot Mode:</strong> {{ bot_mode }}</p>
+    <p title="Indicates that this web admin is available for editing content"><strong>Web Editor:</strong> {{ web_editor }}</p>
+    <p title="Server local time used for scheduling and logs"><strong>Time:</strong> {{ time_str }}</p>
+    <p title="Source commit used to build/deploy this service"><strong>Commit:</strong> <code>{{ commit }}</code></p>
+  </div>
+
+  <div class="card">
+    <h2>Configuration (non‑secret)</h2>
+    <p class="muted">Application settings with secrets removed.</p>
+    <div class="kv">
+      <ul>
+      {% for k, v in config.items() %}
+        <li><span class="k">{{ k }}</span><span class="v">{{ v }}</span></li>
+      {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  {% if runtime_env %}
+  <div class="card">
+    <h2>Runtime</h2>
+    <p class="muted">Cloud Run/Env metadata.</p>
+    <div class="kv">
+      <ul>
+      {% for k, v in runtime_env.items() %}
+        <li><span class="k">{{ k }}</span><span class="v">{{ v }}</span></li>
+      {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  <style>
+    .kv ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .kv li { display: grid; grid-template-columns: 240px 1fr; align-items: center; padding: 10px 12px; border: 1px dashed var(--panel-border); border-radius: 12px; background: rgba(255,255,255,0.4); }
+    html[data-theme="dark"] .kv li { background: rgba(0,0,0,0.15); }
+    .kv .k { font-weight: 600; color: var(--text-muted); }
+    .kv .v { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Bookings{% endblock %}
+{% block content %}
+  <h1>📅 Bookings</h1>
+  <a href="/" class="button" title="Return to main dashboard">← Back to Admin</a>
+  {% if deleted %}<div class="alert">✓ Booking deleted</div>{% endif %}
+
+  <div class="card">
+    <h2>Current Bookings</h2>
+    <p class="muted">This page lists all user registrations. Use it to check attendance and resolve scheduling questions.</p>
+    {% if items %}
+      {% for b in items %}
+        <div class="event-item" title="Booking details">
+          <h4>{{ b.location }} - {{ b.session_type }}</h4>
+          <p><strong>User:</strong> {{ b.user_name }} <small>(ID: {{ b.user_id }})</small></p>
+          <p><strong>Date:</strong> {{ b.date_str }}</p>
+          <p><strong>Time:</strong> {{ b.time_str }}</p>
+          <p><strong>Status:</strong> <span class="status-{{ b.status_color }}" title="Current booking status">{{ b.status }}</span></p>
+          <p><strong>Created:</strong> {{ b.created_at }}</p>
+          <form method="post" action="/bookings/delete" style="margin-top:8px;">
+            <input type="hidden" name="id" value="{{ b.id }}" />
+            <button type="submit" class="button danger" title="Delete booking permanently">🗑️ Delete</button>
+          </form>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>No bookings found.</p>
+    {% endif %}
+  </div>
+{% endblock %}

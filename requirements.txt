@@ -1,0 +1,11 @@
+aiogram==3.13.1
+python-dotenv==1.0.1
+pydantic==2.8.2
+pydantic-settings==2.4.0
+orjson==3.10.7
+fastapi==0.114.2
+uvicorn==0.30.6
+Jinja2==3.1.4
+python-multipart==0.0.6
+dependency-injector==4.41.0
+google-cloud-firestore==2.16.0
