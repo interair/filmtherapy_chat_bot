@@ -122,6 +122,9 @@ jobs:
             echo "BASE_URL: \"${BASE_URL}\"" >> "${ENV_FILE}"
           fi
 
+          # Always pass build metadata
+          echo "GIT_COMMIT: \"${GITHUB_SHA}\"" >> "${ENV_FILE}"
+
           # Deploy with Secret Manager references for sensitive values
           gcloud run deploy "${SERVICE}" \
             --project "${PROJECT}" \
