@@ -141,11 +141,6 @@ resource "google_service_account_iam_member" "wif_impersonation" {
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github[0].name}/attribute.repository/${var.github_owner}/${var.github_repo}"
 }
 
-# Existing resources above...
-
-
-
-
 # Cloud Run v2 service managed by Terraform
 resource "google_cloud_run_v2_service" "app" {
   name     = var.cloud_run_service_name
@@ -175,12 +170,6 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "USE_WEBHOOK"
         value = "true"
       }
-
-      env {
-        name  = "BASE_URL"
-        value = "https://gantich-bot-1060292501119.europe-west4.run.app"
-      }
-
 
       volume_mounts {
         name       = "data-vol"

@@ -6,7 +6,7 @@ Creates
 - GCS bucket for data persistence
 - Service accounts: runtime (for Cloud Run) and deployer (for CI)
 - Optional WIF (Workload Identity Federation) for GitHub OIDC
-- Required API enablement and IAM bindings
+- Required API enablement (Run, Artifact Registry, IAM Credentials, Storage) and IAM bindings
 
 Folders
 - infra/terraform: providers.tf, variables.tf, main.tf, outputs.tf
