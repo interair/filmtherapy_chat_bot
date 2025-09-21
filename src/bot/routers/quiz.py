@@ -12,7 +12,7 @@ router = Router()
 quiz_repo = container.quiz_repository()
 
 
-@router.message(F.text.in_({"Что посмотреть?", "What to watch?"}))
+@router.message(F.text.in_({"Что посмотреть?", "What to watch?", "🎥 Что посмотреть?", "🎥 What to watch?"}))
 async def quiz_start(message: Message) -> None:
     lang = user_lang(message)
     cfg = await quiz_repo.get_config()

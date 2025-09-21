@@ -30,6 +30,14 @@ booking_flow = BookingFlow(calendar, loc_repo)
 SESSION_TYPES = ("Песочная терапия", "Очно", "Онлайн")
 PAGE_SIZE = 7
 
+def _stype_label(stype: str) -> str:
+    s = (stype or "").strip()
+    if s == "Онлайн" or s.lower() == "online":
+        return f"💻 {s}"
+    if s == "Песочная терапия" or ("песоч" in s.lower() or "sand" in s.lower()):
+        return f"🏖️ {s}"
+    return f"🏠 {s}"
+
 def _stype_suffix(stype: str | None) -> str:
     s = (stype or "").strip()
     s_low = s.lower()
@@ -101,17 +109,17 @@ class BookingStates(StatesGroup):
     confirming = State()
 
 
-@router.message(F.text.in_({"Записаться на консультацию", "Book a consultation"}))
+@router.message(F.text.in_({"Записаться на консультацию", "Book a consultation", "🗓️ Записаться на консультацию", "🗓️ Book a consultation"}))
 async def book_entry(message: Message, state: FSMContext) -> None:
     lang = user_lang(message)
     logger.info("Booking: entry user=%s", getattr(message.from_user, "id", None))
     types = SESSION_TYPES
-    rows = [[(stype, f"type:{stype}")] for stype in types]
+    rows = [[(_stype_label(stype), f"type:{stype}")] for stype in types]
     await state.set_state(BookingStates.choosing_type)
     await message.answer(t(lang, "book.choose_type"), reply_markup=ik_kbd(rows))
 
 
-@router.message(F.text.in_({"Онлайн-сессия", "Online session"}))
+@router.message(F.text.in_({"Онлайн-сессия", "Online session", "💻 Онлайн-сессия", "💻 Online session"}))
 async def online_entry(message: Message, state: FSMContext) -> None:
     lang = user_lang(message)
     await state.set_state(BookingStates.choosing_type)
@@ -395,8 +403,8 @@ async def choose_time(cb: CallbackQuery, state: FSMContext) -> None:
         )
         # Show payment/cancel options (payments unavailable yet)
         kbd = ik_kbd([[
-            (t(lang, "book.cancel_button"), f"cancel:{booking['id']}"),
-            (t(lang, "book.pay_button"), f"pay:{booking['id']}")
+            ("❌ " + t(lang, "book.cancel_button"), f"cancel:{booking['id']}") ,
+            ("💳 " + t(lang, "book.pay_button"), f"pay:{booking['id']}")
         ]])
         await cb.message.edit_text(t(lang, "book.pay_unavailable"), reply_markup=kbd)
     except ValidationError:
@@ -454,7 +462,7 @@ async def cancel_booking(cb: CallbackQuery) -> None:
 
 
 
-@router.message(F.text.in_({"Мои записи", "My bookings"}))
+@router.message(F.text.in_({"Мои записи", "My bookings", "📒 Мои записи", "📒 My bookings"}))
 async def my_bookings(message: Message) -> None:
     lang = user_lang(message)
     uid = message.from_user.id if message and message.from_user else None
@@ -554,14 +562,14 @@ async def my_bookings(message: Message) -> None:
         try:
             if it.get("_type") == "session":
                 text = f"{t(lang, 'book.my_title')}\n• {it.get('when_str')} — {it.get('location')} — {it.get('stype')}\n{it.get('status')}"
-                kbd = ik_kbd([[(t(lang, "book.cancel_button"), f"cancel:{it.get('id')}")]])
+                kbd = ik_kbd([[("❌ " + t(lang, "book.cancel_button"), f"cancel:{it.get('id')}")]])
             else:
                 # Cinema event
                 title = it.get("title") or ""
                 place = it.get("place") or ""
                 when_str = it.get("when_str") or ""
                 text = f"🎬 {title}\n• {when_str} — {place}"
-                kbd = ik_kbd([[(t(lang, "book.cancel_button"), f"cancel_event:{it.get('id')}")]])
+                kbd = ik_kbd([[('❌ ' + t(lang, 'book.cancel_button'), f"cancel_event:{it.get('id')}")]])
             await message.answer(text, reply_markup=kbd)
         except Exception:
             continue

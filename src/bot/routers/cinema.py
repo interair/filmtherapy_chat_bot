@@ -15,7 +15,7 @@ event_repo = container.event_repository()
 reg_repo = container.event_registration_repository()
 
 
-@router.message(F.text.in_({"Киноклуб", "Film club"}))
+@router.message(F.text.in_({"Киноклуб", "Film club", "🎬 Киноклуб", "🎬 Film club"}))
 async def film_club(message: Message) -> None:
     lang = user_lang(message)
     poster = await event_repo.get_upcoming()
@@ -46,7 +46,7 @@ async def film_club(message: Message) -> None:
         if len(text) > 1024:
             text = text[:1021] + "..."
             
-        kbd = ik_kbd([[(t(lang, "cinema.register"), f"reg:{getattr(item, 'id', '')}")]])
+        kbd = ik_kbd([[("📝 " + t(lang, "cinema.register"), f"reg:{getattr(item, 'id', '')}")]])
         photo_name = getattr(item, 'photo', None)
         if photo_name:
             photo_path = Path(DATA_DIR) / str(photo_name)
@@ -76,8 +76,8 @@ async def register_film(cb: CallbackQuery) -> None:
             await reg_repo.add(event_id, uid, name)
             msg = t(lang, "cinema.registered")
         kbd = ik_kbd([[ 
-            (t(lang, "book.pay_button"), f"pay_event:{event_id}"),
-            (t(lang, "book.cancel_button"), f"cancel_event:{event_id}")
+            ("💳 " + t(lang, "book.pay_button"), f"pay_event:{event_id}"),
+            ("❌ " + t(lang, "book.cancel_button"), f"cancel_event:{event_id}")
         ]])
         try:
             await cb.message.edit_text(msg, reply_markup=kbd)
