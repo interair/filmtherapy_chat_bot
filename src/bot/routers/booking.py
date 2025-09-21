@@ -448,25 +448,108 @@ async def my_bookings(message: Message) -> None:
     uid = message.from_user.id if message and message.from_user else None
     if not uid:
         return
-    items = calendar.list_user_bookings(uid)
-    if not items:
-        await message.answer(t(lang, "book.my_none"))
-        return
-    # Send one message per booking with a Cancel button
-    for b in items:
+
+    # Collect session bookings (consultations)
+    session_items = []
+    try:
+        session_items = calendar.list_user_bookings(uid) or []
+    except Exception:
+        session_items = []
+
+    # Collect cinema registrations
+    event_repo = container.event_repository()
+    reg_repo = container.event_registration_repository()
+    cinema_items = []
+    try:
+        regs = await reg_repo.list_by_user(uid)
+        for r in regs:
+            ev_id = r.get("event_id")
+            if not ev_id:
+                continue
+            try:
+                ev = await event_repo.get_by_id(ev_id)
+            except Exception:
+                ev = None
+            if not ev:
+                continue
+            # Prepare a pseudo-booking dict to unify rendering
+            when_dt = getattr(ev, "when", None)
+            when_str = ""
+            ts_sort = 0.0
+            if when_dt:
+                try:
+                    when_utc = when_dt
+                    when_str = when_utc.strftime("%Y-%m-%d %H:%M")
+                    ts_sort = when_utc.timestamp()
+                except Exception:
+                    when_str = str(when_dt)
+                    ts_sort = 0.0
+            cinema_items.append({
+                "_type": "cinema",
+                "id": str(ev_id),
+                "when_str": when_str,
+                "ts": ts_sort,
+                "title": getattr(ev, "title", ""),
+                "place": getattr(ev, "place", ""),
+            })
+    except Exception:
+        cinema_items = []
+
+    # Transform session bookings into unified items
+    unified = []
+    for b in (session_items or []):
         try:
             start_iso = b.get("start")
-            end_iso = b.get("end")
             when = ""
+            ts = 0.0
             if isinstance(start_iso, str) and 'T' in start_iso:
                 date_s = start_iso.split('T', 1)[0]
                 time_s = start_iso.split('T', 1)[1][:5]
                 when = f"{date_s} {time_s}"
+                # Attempt to parse for sorting
+                try:
+                    from datetime import datetime
+                    ts = datetime.fromisoformat(start_iso.replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    ts = 0.0
             location = b.get("location") or "Online"
             stype = b.get("session_type") or "Session"
             status = b.get("status") or ""
-            text = f"{t(lang, 'book.my_title')}\n• {when} — {location} — {stype}\n{status}"
-            kbd = ik_kbd([[(t(lang, "book.cancel_button"), f"cancel:{b.get('id')}")]])
+            unified.append({
+                "_type": "session",
+                "id": b.get("id"),
+                "when_str": when,
+                "ts": ts,
+                "location": location,
+                "stype": stype,
+                "status": status,
+            })
+        except Exception:
+            continue
+
+    # Append cinema items
+    unified.extend(cinema_items)
+
+    if not unified:
+        await message.answer(t(lang, "book.my_none"))
+        return
+
+    # Sort by time if available
+    unified.sort(key=lambda x: x.get("ts") or 0)
+
+    # Render all
+    for it in unified:
+        try:
+            if it.get("_type") == "session":
+                text = f"{t(lang, 'book.my_title')}\n• {it.get('when_str')} — {it.get('location')} — {it.get('stype')}\n{it.get('status')}"
+                kbd = ik_kbd([[(t(lang, "book.cancel_button"), f"cancel:{it.get('id')}")]])
+            else:
+                # Cinema event
+                title = it.get("title") or ""
+                place = it.get("place") or ""
+                when_str = it.get("when_str") or ""
+                text = f"🎬 {title}\n• {when_str} — {place}"
+                kbd = ik_kbd([[(t(lang, "book.cancel_button"), f"cancel_event:{it.get('id')}")]])
             await message.answer(text, reply_markup=kbd)
         except Exception:
             continue

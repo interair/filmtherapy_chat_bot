@@ -717,6 +717,7 @@ class EventRegistrationRepository:
     def __init__(self) -> None:
         self._col = get_client().collection("event_regs")
         # Index hint: Single field index on event_id for get_by_event queries
+        # Index hint: Single field index on user_id for list_by_user queries
 
     @staticmethod
     def _doc_id(event_id: str, user_id: int | str) -> str:
@@ -754,27 +755,42 @@ class EventRegistrationRepository:
     async def get_by_event(self, event_id: str) -> List[dict]:
         items: List[dict] = []
         try:
-            # Очищаем ID события от лишних пробелов
             clean_event_id = str(event_id).strip()
             if not clean_event_id:
                 return items
-                
-            # Создаем запрос с правильной фильтрацией
             query = (self._col
                     .where(filter=FieldFilter("event_id", "==", clean_event_id))
                     .order_by("created_at")
-                    .limit(200))  # Reasonable limit for event registrations
-            
+                    .limit(200))
             for doc in query.stream():
                 d = doc.to_dict() or {}
                 d.setdefault("id", doc.id)
                 items.append(d)
-                
         except Exception as e:
-            # Логируем ошибку для диагностики
             import logging
             logging.getLogger(__name__).error(f"Error getting registrations for event {event_id}: {e}")
-            
+        return items
+
+    async def list_by_user(self, user_id: int | str) -> List[dict]:
+        """Return all event registrations for the specified user.
+        Each item contains at least: id, event_id, user_id, user_name, created_at.
+        """
+        items: List[dict] = []
+        try:
+            uid = str(user_id).strip()
+            if not uid:
+                return items
+            query = (self._col
+                    .where(filter=FieldFilter("user_id", "==", uid))
+                    .order_by("created_at")
+                    .limit(200))
+            for doc in query.stream():
+                d = doc.to_dict() or {}
+                d.setdefault("id", doc.id)
+                items.append(d)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error getting registrations for user {user_id}: {e}")
         return items
 
 
