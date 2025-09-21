@@ -189,7 +189,7 @@ resource "google_cloud_run_v2_service" "app" {
           memory = "512Mi"
           cpu    = "1"    # Now allowed with concurrency = 1
         }
-        cpu_idle = false     # Allow CPU to idle when not processing
+        cpu_idle = true     # Allow CPU to idle when not processing
       }
 
       # Optimize startup probe for faster cold starts
