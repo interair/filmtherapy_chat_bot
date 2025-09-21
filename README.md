@@ -1,4 +1,4 @@
-# Internal Telegram Bot (Booking, Sand Therapy, Online, Film Club)
+# Internal Telegram Bot (Booking, Sand Therapy, Online, Film Club) - written from scratch
 
 Last updated: 2025-09-21
 
