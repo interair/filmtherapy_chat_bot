@@ -30,18 +30,13 @@ class DB:
     # Transactions
     def run_transaction(self, func: Callable[[firestore.Transaction], Any]) -> Any:
         tx = self._client.transaction()
+        # Use context manager API compatible with google-cloud-firestore v2+
         try:
-            # Firestore requires transaction to be begun before it's passed into API calls
-            tx.begin()
-            result = func(tx)
-            tx.commit()
-            return result
-        except Exception as e:
-            logger.exception("Firestore transaction failed; rolling back")
-            try:
-                tx.rollback()
-            except Exception:
-                logger.debug("Firestore transaction rollback failed", exc_info=True)
+            with tx:
+                return func(tx)
+        except Exception:
+            logger.exception("Firestore transaction failed")
+            # Context manager will handle rollback automatically where applicable
             raise
 
     # Array operations
