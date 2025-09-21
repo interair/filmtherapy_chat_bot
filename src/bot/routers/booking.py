@@ -30,6 +30,48 @@ booking_flow = BookingFlow(calendar, loc_repo)
 SESSION_TYPES = ("Песочная терапия", "Очно", "Онлайн")
 PAGE_SIZE = 7
 
+def _stype_suffix(stype: str | None) -> str:
+    s = (stype or "").strip()
+    s_low = s.lower()
+    if s == "Онлайн" or s_low == "online":
+        return "online"
+    if s == "Песочная терапия" or "песоч" in s_low or "sand" in s_low:
+        return "sand"
+    return "offline"
+
+def _num_price(val: str | float | int, default: float = 90.0) -> float:
+    try:
+        if isinstance(val, (int, float)):
+            return float(val)
+        return float(str(val).replace(",", ".").strip())
+    except Exception:
+        return float(default)
+
+def _get_price(lang: str | None, suffix: str) -> float:
+    try:
+        price_str = (t(lang, f"price.{suffix}") or "90").strip()
+    except Exception:
+        price_str = "90"
+    return _num_price(price_str)
+
+def _payment_message_text(lang: str | None, suffix: str, price: float) -> tuple[str | None, str | None]:
+    # Returns (text, url) if available, otherwise (None, None)
+    try:
+        msg_text = (t(lang, f"book.payment_link.{suffix}") or "").strip()
+        if not msg_text or msg_text == f"book.payment_link.{suffix}":
+            msg_text = t(lang, "book.payment_link")
+    except Exception:
+        msg_text = t(lang, "book.payment_link")
+    try:
+        url = (t(lang, "book.payment_url") or "").strip()
+    except Exception:
+        url = ""
+    if not url or url == "book.payment_url":
+        return None, None
+    price_label = "Цена" if (lang or "ru").startswith("ru") else "Price"
+    price_str = f"{int(price) if float(price).is_integer() else price}€"
+    return f"{msg_text}\n{price_label}: {price_str}\n{url}", url
+
 async def safe_cb_answer(cb: CallbackQuery, text: str | None = None, show_alert: bool = False) -> None:
     try:
         await cb.answer(text=text, show_alert=show_alert)
@@ -368,58 +410,28 @@ async def choose_time(cb: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data.startswith("pay:"))
 async def pay(cb: CallbackQuery) -> None:
     lang = user_lang(cb)
-    # Determine booking and session type to choose per-type text and price
     booking_id = cb.data.split(":", 1)[1] if isinstance(cb.data, str) else ""
     repo = container.booking_repository()
-    booking = None
+
+    # Resolve booking and session type
     try:
-        if booking_id:
-            booking = repo.get_by_id_sync(booking_id)
+        booking = repo.get_by_id_sync(booking_id) if booking_id else None
     except Exception:
         booking = None
     stype = (booking.get("session_type") if isinstance(booking, dict) else None) or ""
-    # Map session type to suffix
-    suffix = "offline"
-    if stype == "Онлайн" or stype.lower() == "online":
-        suffix = "online"
-    elif stype == "Песочная терапия" or "песоч" in stype.lower() or "sand" in stype.lower():
-        suffix = "sand"
-    else:
-        # Treat any other non-online as in-person
-        suffix = "offline"
-    # Read price from i18n (default 90)
-    def _num_price(val: str) -> float:
-        try:
-            return float(str(val).replace(",", ".").strip())
-        except Exception:
-            return 90.0
+    suffix = _stype_suffix(stype)
+
+    # Price from i18n; persist into booking if possible
+    price_val = _get_price(lang, suffix)
     try:
-        price_str = (t(lang, f"price.{suffix}") or "90").strip()
-    except Exception:
-        price_str = "90"
-    price_val = _num_price(price_str)
-    # Persist price into booking if possible
-    try:
-        if booking_id and isinstance(price_val, (int, float)):
+        if booking_id:
             repo.patch_sync(booking_id, {"price": float(price_val)})
     except Exception:
         pass
-    # Choose message text (type-specific fallback to generic)
-    try:
-        msg_text = (t(lang, f"book.payment_link.{suffix}") or "").strip()
-        if not msg_text or msg_text == f"book.payment_link.{suffix}":
-            msg_text = t(lang, "book.payment_link")
-    except Exception:
-        msg_text = t(lang, "book.payment_link")
-    # URL handling
-    try:
-        url = (t(lang, "book.payment_url") or "").strip()
-    except Exception:
-        url = ""
-    if url and url != "book.payment_url":
-        # Localized label for price
-        price_label = "Цена" if (lang or "ru").startswith("ru") else "Price"
-        text = f"{msg_text}\n{price_label}: {int(price_val) if price_val.is_integer() else price_val}€\n{url}"
+
+    # Compose payment message
+    text, url = _payment_message_text(lang, suffix, price_val)
+    if text:
         try:
             await cb.message.answer(text, disable_web_page_preview=True)
         except Exception:
