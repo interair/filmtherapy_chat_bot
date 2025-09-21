@@ -61,8 +61,8 @@ class MetricsRepository:
         feat_ref = self.daily_col.document(date_str).collection("features").document(sanitized_key)
 
         def _tx(tx) -> None:
-            # Use DocumentReference.get(transaction=tx) to reliably obtain a DocumentSnapshot
-            snap = feat_ref.get(transaction=tx)
+            # Begin transaction by using the transaction-bound get
+            snap = tx.get(feat_ref)
             current = int(snap.get("count")) if getattr(snap, "exists", False) and snap.get("count") is not None else 0
             tx.set(feat_ref, {"count": current + int(by)}, merge=False)
 
