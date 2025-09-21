@@ -35,6 +35,14 @@ resource "google_artifact_registry_repository" "bot_images" {
   repository_id = "bot-images"
   format        = "DOCKER"
   description   = "Images for Cloud Run deployments"
+
+  cleanup_policies {
+    id     = "delete-untagged"
+    action = "DELETE"
+    condition {
+      tag_state = "UNTAGGED"
+    }
+  }
 }
 
 # CI deployer can push to AR
