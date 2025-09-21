@@ -27,3 +27,5 @@ data/
 # Others
 .DS_Store
 terraform.tfstate*
+# Do not include repository screenshots/images in Docker context
+imgs/

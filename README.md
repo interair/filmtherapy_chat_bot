@@ -50,26 +50,26 @@ See .env.example for the full list.
 
 ## Screenshots
 
-<p align="center">
-  <img src="imgs/app-01.webp" width="320" alt="App screen 1" />
-  <img src="imgs/app-02.webp" width="320" alt="App screen 2" />
-  <img src="imgs/app-03.webp" width="320" alt="App screen 3" />
-</p>
-
-<p align="center">
-  <img src="imgs/app-04.webp" width="320" alt="App screen 4" />
-  <img src="imgs/app-05.webp" width="320" alt="App screen 5" />
-  <img src="imgs/app-06.webp" width="320" alt="App screen 6" />
-</p>
-
-<p align="center">
-  <img src="imgs/app-07.webp" width="320" alt="App screen 7" />
-  <img src="imgs/app-08.webp" width="320" alt="App screen 8" />
-  <img src="imgs/app-09.webp" width="320" alt="App screen 9" />
-</p>
-
-<p align="center">
-  <img src="imgs/app-10.webp" width="320" alt="App screen 10" />
-  <img src="imgs/app-11.webp" width="320" alt="App screen 11" />
-  <img src="imgs/app-12.webp" width="320" alt="App screen 12" />
-</p>
+<div align="center">
+<table>
+  <tr>
+    <td valign="top"><img src="imgs/app-01.webp" width="320" alt="App screen 1" /></td>
+    <td valign="top"><img src="imgs/app-02.webp" width="320" alt="App screen 2" /></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="imgs/app-03.webp" width="320" alt="App screen 3" /></td>
+    <td valign="top"><img src="imgs/app-04.webp" width="320" alt="App screen 4" /></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="imgs/app-05.webp" width="320" alt="App screen 5" /></td>
+    <td valign="top"><img src="imgs/app-06.webp" width="320" alt="App screen 6" /></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="imgs/app-07.webp" width="320" alt="App screen 7" /></td>
+    <td valign="top"><img src="imgs/app-08.webp" width="320" alt="App screen 8" /></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="imgs/app-09.webp" width="320" alt="App screen 9" /></td>
+  </tr>
+</table>
+</div>
