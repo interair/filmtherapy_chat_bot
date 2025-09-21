@@ -6,16 +6,7 @@ FROM python:3.11-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PATH="/home/appuser/.local/bin:$PATH"
-
-# System deps for building wheels if needed
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        bash \
-    && rm -rf /var/lib/apt/lists/*
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Create user and workdir
 RUN useradd -m -u 10001 appuser
@@ -25,13 +16,11 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
-# Copy the rest of the project
+# Copy the application source
 COPY src ./src
-COPY README.md ./
-COPY run.sh ./
+
 # Create runtime dirs and set permissions
-RUN chmod +x run.sh \
-    && mkdir -p logs data \
+RUN mkdir -p logs data \
     && chown -R appuser:appuser /app
 
 USER appuser
@@ -40,4 +29,4 @@ USER appuser
 # HEALTHCHECK can be added if using webhooks
 
 # The bot reads configuration from environment variables (.env can be passed via --env-file)
-CMD ["./run.sh"]
+CMD ["python", "-m", "src.main"]
