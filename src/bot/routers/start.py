@@ -72,7 +72,7 @@ async def cmd_language(message: Message) -> None:
     await message.answer(t("ru", "lang.choose"), reply_markup=lang_kbd())
 
 
-@router.message(F.text.in_({"О специалисте", "About"}))
+@router.message(F.text.func(lambda s: isinstance(s, str) and ("О специалисте" in s or "About" in s)))
 async def about_handler(message: Message) -> None:
     lang = user_lang(message)
     loop = asyncio.get_running_loop()
