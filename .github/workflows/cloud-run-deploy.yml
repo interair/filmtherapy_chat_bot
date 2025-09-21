@@ -72,14 +72,6 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Ensure required APIs (best-effort)
-        run: |
-          gcloud --project "${{ steps.cfg.outputs.project }}" services enable \
-            run.googleapis.com \
-            storage.googleapis.com \
-            iamcredentials.googleapis.com \
-            artifactregistry.googleapis.com || echo "Skipping: no permission to enable APIs"
-
       - name: Configure Docker for Artifact Registry
         run: |
           gcloud auth configure-docker "${{ steps.cfg.outputs.ar_host }}" --quiet

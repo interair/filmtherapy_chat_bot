@@ -3,7 +3,8 @@
 We deploy from GitHub Actions using .github/workflows/cloud-run-deploy.yml. It builds the image and pushes to Google Artifact Registry, then deploys to Cloud Run and sets the Telegram webhook (if BASE_URL and TELEGRAM_TOKEN are set).
 
 ## Requirements
-- GCP project. Required APIs (Cloud Run, Artifact Registry, IAM Credentials, Cloud Storage) are enabled automatically by Terraform in infra/terraform. 
+- GCP project. Required APIs (Cloud Run, Artifact Registry, IAM Credentials, Cloud Storage, Secret Manager) are enabled automatically by Terraform in infra/terraform.
+  - The CI workflow assumes Terraform has been applied and will fail fast with a helpful message if these APIs are not enabled. It will not attempt to enable them itself.
 - Service Account for deploy (WIF preferred) and optional runtime SA for Cloud Run.
 
 ## Repository variables/secrets
