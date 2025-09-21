@@ -6,6 +6,9 @@ terraform {
       version = ">= 5.0"
     }
   }
+  # Store Terraform state securely in Google Cloud Storage
+  # Configure via: terraform init -backend-config="bucket=YOUR_BUCKET" -backend-config="prefix=terraform/state"
+  # backend "gcs" {}
 }
 
 provider "google" {

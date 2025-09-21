@@ -26,3 +26,4 @@ data/
 
 # Others
 .DS_Store
+terraform.tfstate*

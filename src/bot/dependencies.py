@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
@@ -24,8 +25,15 @@ async def verify_web_auth(credentials: HTTPBasicCredentials = Depends(security))
             detail="Web editor disabled",
         )
 
-    username_ok = (credentials.username == settings.web_username)
-    password_ok = (credentials.password == settings.web_password)
+    # Use constant-time comparison to mitigate timing attacks
+    username_ok = (
+        settings.web_username is not None and
+        secrets.compare_digest(credentials.username, settings.web_username)
+    )
+    password_ok = (
+        settings.web_password is not None and
+        secrets.compare_digest(credentials.password, settings.web_password)
+    )
     if not (username_ok and password_ok):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

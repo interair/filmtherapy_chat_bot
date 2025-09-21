@@ -56,18 +56,19 @@ jobs:
           echo "ar_image=${AR_IMAGE}" >> "$GITHUB_OUTPUT"
 
       # Authenticate to Google Cloud (WIF preferred)
+      - name: Validate WIF inputs
+        run: |
+          set -euo pipefail
+          if [ -z "${WORKLOAD_IDENTITY_PROVIDER:-}" ] || [ -z "${SERVICE_ACCOUNT_EMAIL:-}" ]; then
+            echo "::error::WORKLOAD_IDENTITY_PROVIDER and SERVICE_ACCOUNT_EMAIL must be set as Actions variables."
+            exit 1
+          fi
+
       - name: Auth via Workload Identity Federation
-        if: ${{ env.WORKLOAD_IDENTITY_PROVIDER != '' && env.SERVICE_ACCOUNT_EMAIL != '' }}
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Auth via Service Account Key (fallback)
-        if: ${{ env.WORKLOAD_IDENTITY_PROVIDER == '' || env.SERVICE_ACCOUNT_EMAIL == '' }}
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
