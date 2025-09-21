@@ -157,11 +157,6 @@ resource "google_cloud_run_v2_service" "app" {
       image = var.app_image
 
       env {
-        name  = "WEB_PORT"
-        value = "8080"
-      }
-
-      env {
         name  = "GOOGLE_CLOUD_PROJECT"
         value = var.project_id
       }
