@@ -15,7 +15,7 @@ WORKDIR /app
 
 # Copy only requirements first for better layer caching
 COPY requirements.txt ./
-RUN pip install -r requirements.txt
+RUN python -m pip install --no-cache-dir --prefer-binary -r requirements.txt
 
 # Copy the application source
 COPY src ./src
