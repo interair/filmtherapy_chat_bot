@@ -163,8 +163,7 @@ resource "google_cloud_run_v2_service" "app" {
   template {
     service_account = google_service_account.runtime.email
     
-    # Set to 1 for single-threaded bot with < 1 CPU
-    max_instance_request_concurrency = 1
+    max_instance_request_concurrency = 5
 
     containers {
       image = var.app_image
