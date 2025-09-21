@@ -46,7 +46,7 @@ class Container(containers.DeclarativeContainer):
     )
     event_service = providers.Singleton(EventService)
     metrics_repository = providers.Singleton(MetricsRepository)
-    metrics_service = providers.Singleton(MetricsService)
+    metrics_service = providers.Singleton(MetricsService, repo=metrics_repository)
 
     # Shared thread pool executor for offloading blocking I/O
     executor = providers.Singleton(ThreadPoolExecutor, max_workers=int(os.getenv("WORKERS", "4")))

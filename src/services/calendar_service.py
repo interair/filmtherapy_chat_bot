@@ -33,12 +33,13 @@ class CalendarService:
 
     def __init__(
         self,
-        bookings_repo: BookingRepository | None = None,
-        schedule_repo: ScheduleRepository | None = None,
+        bookings_repo: BookingRepository,
+        schedule_repo: ScheduleRepository,
     ) -> None:
-        # Allow DI to provide repositories; fallback to defaults
-        self._bookings_repo = bookings_repo or BookingRepository()
-        self._schedule_repo = schedule_repo or ScheduleRepository()
+        if bookings_repo is None or schedule_repo is None:
+            raise ValueError("CalendarService requires repositories to be provided via DI")
+        self._bookings_repo = bookings_repo
+        self._schedule_repo = schedule_repo
 
     # --- Helpers -----------------------------------------------------
     @staticmethod

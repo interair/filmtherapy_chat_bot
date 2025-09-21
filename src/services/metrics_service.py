@@ -101,8 +101,10 @@ class MetricsRepository:
 
 
 class MetricsService:
-    def __init__(self) -> None:
-        self._repo = MetricsRepository()
+    def __init__(self, repo: MetricsRepository) -> None:
+        if repo is None:
+            raise ValueError("MetricsService requires repository to be provided via DI")
+        self._repo = repo
 
     @staticmethod
     def _today_str(dt: Optional[datetime] = None) -> str:
