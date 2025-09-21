@@ -20,12 +20,17 @@ Variables
 
 Secrets
 - GCP_SA_KEY (only if not using WIF)
-- TELEGRAM_TOKEN, WEB_USERNAME, WEB_PASSWORD (app secrets)
+- TELEGRAM_TOKEN, WEB_USERNAME, WEB_PASSWORD (optional; used by the workflow only for setting the Telegram webhook post-deploy). Runtime secrets are sourced from Secret Manager.
+
+Optional variables (to override Secret Manager secret IDs)
+- SECRET_TELEGRAM_TOKEN (default: TELEGRAM_TOKEN)
+- SECRET_WEB_USERNAME (default: WEB_USERNAME)
+- SECRET_WEB_PASSWORD (default: WEB_PASSWORD)
 
 ## How it works
 - Auth via WIF if configured, otherwise via GCP_SA_KEY.
 - docker/build-push-action builds and pushes image to REGION-docker.pkg.dev/PROJECT/AR_REPOSITORY/owner/repo:ref
-- gcloud run deploy uses that image and passes minimal env vars (from repo vars/secrets) as an env file.
+- gcloud run deploy uses that image; passes non-sensitive env vars via an env file and wires TELEGRAM_TOKEN/WEB_USERNAME/WEB_PASSWORD from Secret Manager using --set-secrets.
 - After deploy, the workflow calls Telegram setWebhook if TELEGRAM_TOKEN and BASE_URL are present.
 
 ## First setup

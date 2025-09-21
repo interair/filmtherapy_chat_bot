@@ -22,6 +22,12 @@ resource "google_project_service" "artifactregistry" {
   service = "artifactregistry.googleapis.com"
 }
 
+# Enable Secret Manager
+resource "google_project_service" "secretmanager" {
+  project = var.project_id
+  service = "secretmanager.googleapis.com"
+}
+
 # Docker repository for container images
 resource "google_artifact_registry_repository" "bot_images" {
   project       = var.project_id
@@ -42,6 +48,13 @@ resource "google_project_iam_member" "deployer_artifact_writer" {
 resource "google_project_iam_member" "runtime_artifact_reader" {
   project = var.project_id
   role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${google_service_account.runtime.email}"
+}
+
+# Allow runtime SA to access Secret Manager secrets at runtime
+resource "google_project_iam_member" "runtime_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.runtime.email}"
 }
 

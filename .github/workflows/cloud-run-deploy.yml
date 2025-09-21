@@ -103,34 +103,25 @@ jobs:
       - name: Deploy to Cloud Run
         env:
           IMAGE_URI: ${{ steps.cfg.outputs.ar_image }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          WEB_USERNAME: ${{ secrets.WEB_USERNAME }}
-          WEB_PASSWORD: ${{ secrets.WEB_PASSWORD }}
           ADMINS: ${{ vars.ADMINS }}
           BASE_URL: ${{ vars.BASE_URL }}
           USE_WEBHOOK: ${{ vars.USE_WEBHOOK }}
+          # Optional overrides for Secret Manager secret IDs (defaults equal to env var names)
+          SECRET_TELEGRAM_TOKEN: ${{ vars.SECRET_TELEGRAM_TOKEN || 'TELEGRAM_TOKEN' }}
+          SECRET_WEB_USERNAME: ${{ vars.SECRET_WEB_USERNAME || 'WEB_USERNAME' }}
+          SECRET_WEB_PASSWORD: ${{ vars.SECRET_WEB_PASSWORD || 'WEB_PASSWORD' }}
         run: |
           set -euo pipefail
           PROJECT="${{ steps.cfg.outputs.project }}"
           REGION="${{ steps.cfg.outputs.region }}"
           SERVICE="${{ steps.cfg.outputs.service }}"
 
-          # Only pass essential app secrets; infra config is managed by Terraform
+          # Pass only non-sensitive vars via env file
           ENV_FILE="$(mktemp)"
           : > "${ENV_FILE}"
-          if [ -n "${TELEGRAM_TOKEN:-}" ]; then
-            echo "TELEGRAM_TOKEN: \"${TELEGRAM_TOKEN}\"" >> "${ENV_FILE}"
-          fi
           if [ -n "${ADMINS:-}" ]; then
             echo "ADMINS: \"${ADMINS}\"" >> "${ENV_FILE}"
           fi
-          if [ -n "${WEB_USERNAME:-}" ]; then
-            echo "WEB_USERNAME: \"${WEB_USERNAME}\"" >> "${ENV_FILE}"
-          fi
-          if [ -n "${WEB_PASSWORD:-}" ]; then
-            echo "WEB_PASSWORD: \"${WEB_PASSWORD}\"" >> "${ENV_FILE}"
-          fi
-          # Added: webhook-related variables from repo variables
           if [ -n "${USE_WEBHOOK:-}" ]; then
             echo "USE_WEBHOOK: \"${USE_WEBHOOK}\"" >> "${ENV_FILE}"
           fi
@@ -138,14 +129,18 @@ jobs:
             echo "BASE_URL: \"${BASE_URL}\"" >> "${ENV_FILE}"
           fi
 
+          # Deploy with Secret Manager references for sensitive values
           gcloud run deploy "${SERVICE}" \
             --project "${PROJECT}" \
             --region "${REGION}" \
             --platform managed \
             --image "${IMAGE_URI}" \
-            --env-vars-file="${ENV_FILE}"
+            --env-vars-file="${ENV_FILE}" \
+            --set-secrets "TELEGRAM_TOKEN=${SECRET_TELEGRAM_TOKEN}:latest" \
+            --set-secrets "WEB_USERNAME=${SECRET_WEB_USERNAME}:latest" \
+            --set-secrets "WEB_PASSWORD=${SECRET_WEB_PASSWORD}:latest"
 
-          echo "Deployed ${SERVICE} in ${REGION} with image ${IMAGE_URI}"
+          echo "Deployed ${SERVICE} in ${REGION} with image ${IMAGE_URI} (secrets via Secret Manager)"
 
       - name: Set Telegram webhook
         env:
