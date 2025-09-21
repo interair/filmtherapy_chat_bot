@@ -213,10 +213,10 @@ resource "google_cloud_run_v2_service" "app" {
 
     scaling {
       max_instance_count = 1
-      min_instance_count = 1  # Scale to zero when not needed
+      min_instance_count = 0  # Scale to zero when not needed
     }
     # Reduce timeout for faster scale-down
-    timeout = "60s"
+    timeout = "3600s"
     
     execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
   }
