@@ -209,17 +209,13 @@ async def web_system(request: Request, _: None = Depends(verify_web_auth)):
     # Determine bot mode
     bot_mode = "webhook" if settings.use_webhook and settings.base_url else "polling"
 
-    # Build sanitized configuration dict (exclude secrets)
+    # Build configuration dict using a whitelist of non-sensitive fields
     cfg = settings.model_dump()
-    def _is_secret(k: str) -> bool:
-        k_low = k.lower()
-        return any(s in k_low for s in ("token", "password", "secret", "apikey", "api_key", "key"))
+    allowed_keys = {"admins", "base_url", "default_lang", "use_webhook", "web_port"}
     safe_cfg = {}
-    for k, v in sorted(cfg.items()):
-        if _is_secret(k):
-            safe_cfg[k] = "***"
-        else:
-            safe_cfg[k] = v
+    for k in sorted(allowed_keys):
+        if k in cfg:
+            safe_cfg[k] = cfg.get(k)
 
     # Add a few useful env/runtime values
     extra_env_keys = [
