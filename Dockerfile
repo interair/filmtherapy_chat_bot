@@ -6,7 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONPATH="/app" \
-    PYTHONNOUSERSITE=1
+    PYTHONNOUSERSITE=1 \
+    APP_PROFILE_STARTUP=1
 
 # Create user and workdir in one layer
 RUN useradd -m -u 10001 appuser && mkdir -p /app
