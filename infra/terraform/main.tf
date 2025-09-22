@@ -198,6 +198,7 @@ resource "google_cloud_run_v2_service" "app" {
           cpu    = "1"    # Now allowed with concurrency = 1
         }
         cpu_idle = true     # Allow CPU to idle when not processing
+        startup_cpu_boost = true  # Faster cold starts by boosting CPU during startup
       }
 
       # Optimize startup probe for faster cold starts
@@ -205,10 +206,10 @@ resource "google_cloud_run_v2_service" "app" {
         tcp_socket {
           port = 8080
         }
-        initial_delay_seconds = 5
-        timeout_seconds = 3
-        failure_threshold = 3
-        period_seconds = 5
+        initial_delay_seconds = 1
+        timeout_seconds = 2
+        failure_threshold = 8
+        period_seconds = 2
       }
     }
 
