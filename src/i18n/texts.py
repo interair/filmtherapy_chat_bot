@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Dict
-from ..services.storage import read_json
 
+from ..services.storage import read_json
 
 # Small in-memory cache for overrides to avoid disk I/O on each lookup
 _OVERRIDES_CACHE: Dict[str, Dict[str, str]] = {"RU": {}, "EN": {}}
