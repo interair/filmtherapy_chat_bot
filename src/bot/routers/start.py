@@ -12,10 +12,7 @@ from ...container import container
 
 router = Router()
 
-user_lang_repo = container.user_language_repository()
-about_repo = container.about_repository()
-metrics = container.metrics_service()
-executor = container.executor()
+
 
 
 @router.message(CommandStart())
@@ -27,8 +24,8 @@ async def cmd_start(message: Message) -> None:
             loop = asyncio.get_running_loop()
             # Fire-and-forget metrics recording in thread pool
             loop.run_in_executor(
-                executor,
-                metrics.record_start,
+                container.executor(),
+                container.metrics_service().record_start,
                 uid,
                 getattr(u, "language_code", None),
                 getattr(u, "username", None),
@@ -37,7 +34,7 @@ async def cmd_start(message: Message) -> None:
             )
         except Exception:
             pass
-    saved = (await asyncio.get_running_loop().run_in_executor(executor, user_lang_repo.get_sync, uid)) if uid else None
+    saved = (await asyncio.get_running_loop().run_in_executor(container.executor(), container.user_language_repository().get_sync, uid)) if uid else None
     if not saved:
         await message.answer(t("ru", "lang.choose"), reply_markup=lang_kbd())
         return
@@ -51,10 +48,10 @@ async def set_language(cb: CallbackQuery) -> None:
     if val not in ("ru", "en"):
         await cb.answer("Unknown language", show_alert=True)
         return
-    await user_lang_repo.set(cb.from_user.id, val)
+    await container.user_language_repository().set(cb.from_user.id, val)
     try:
         loop = asyncio.get_running_loop()
-        loop.run_in_executor(executor, metrics.record_interaction, cb.from_user.id, "feature:set_language")
+        loop.run_in_executor(container.executor(), container.metrics_service().record_interaction, cb.from_user.id, "feature:set_language")
     except Exception:
         pass
     # Send a single welcome message with main menu to avoid duplicate greetings
@@ -66,7 +63,7 @@ async def set_language(cb: CallbackQuery) -> None:
 async def cmd_language(message: Message) -> None:
     try:
         loop = asyncio.get_running_loop()
-        loop.run_in_executor(executor, metrics.record_interaction, message.from_user.id, "command:/language")
+        loop.run_in_executor(container.executor(), container.metrics_service().record_interaction, message.from_user.id, "command:/language")
     except Exception:
         pass
     await message.answer(t("ru", "lang.choose"), reply_markup=lang_kbd())
@@ -76,7 +73,7 @@ async def cmd_language(message: Message) -> None:
 async def about_handler(message: Message) -> None:
     lang = user_lang(message)
     loop = asyncio.get_running_loop()
-    photo_path = await loop.run_in_executor(executor, about_repo.get_photo_file_path_sync)
+    photo_path = await loop.run_in_executor(container.executor(), container.about_repository().get_photo_file_path_sync)
     about_text = t(lang, "about.text")
 
     # First send the text message

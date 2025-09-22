@@ -27,7 +27,7 @@ from ..config import settings
 from ..i18n.texts import RU, EN
 from ..services.repositories import EventRepository, LocationRepository, QuizRepository, AboutRepository, ScheduleRepository, SessionLocationsRepository
 from ..container import container
-calendar_service = container.calendar_service()
+
 from .dependencies import (
     verify_web_auth,
     get_event_service,
@@ -171,7 +171,7 @@ async def web_index(request: Request, metrics = Depends(get_metrics_service), _:
     # Count bookings created today (UTC) for attention banner
     new_bookings_today = 0
     try:
-        raw_bookings = calendar_service.list_all_bookings()
+        raw_bookings = container.calendar_service().list_all_bookings()
         if raw_bookings:
             today_utc = datetime.utcnow().date()
             for b in raw_bookings:
@@ -468,7 +468,7 @@ async def web_quiz_save(
 @app.get("/bookings", response_class=HTMLResponse)
 async def web_bookings(request: Request, _: None = Depends(verify_web_auth)):
     deleted = request.query_params.get("deleted") == "1"
-    raw = calendar_service.list_all_bookings()
+    raw = container.calendar_service().list_all_bookings()
     items = []
     for booking in raw:
         status = booking.get('status', 'Unknown')
@@ -908,7 +908,7 @@ async def web_bookings_delete(request: Request, _: None = Depends(verify_web_aut
     if booking_id:
         logger.info("Web: bookings/delete id=%s", booking_id)
         try:
-            calendar_service.admin_delete_booking(booking_id)
+            container.calendar_service().admin_delete_booking(booking_id)
         except Exception:
             # Ignore errors for idempotency
             pass

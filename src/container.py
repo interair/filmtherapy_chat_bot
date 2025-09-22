@@ -19,6 +19,7 @@ from .services.calendar_service import CalendarService
 from .services.event_service import EventService
 from .services.metrics_service import MetricsService, MetricsRepository
 from .config import settings
+from .bot.booking_flow import BookingFlow
 
 
 class Container(containers.DeclarativeContainer):
@@ -54,6 +55,13 @@ class Container(containers.DeclarativeContainer):
     # Aliases for simple repositories used as services in FastAPI dependencies
     location_service = providers.Singleton(LocationRepository)
     quiz_service = providers.Singleton(QuizRepository)
+
+    # Booking flow as a singleton: stateless except for small schedule cache reused across requests
+    booking_flow = providers.Singleton(
+        BookingFlow,
+        calendar_service=calendar_service,
+        location_repo=location_repository,
+    )
 
 
 # Global, configured container instance

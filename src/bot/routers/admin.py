@@ -8,11 +8,10 @@ from ...config import settings
 from ...i18n.texts import t
 from ...container import container
 from ..utils import user_lang
-calendar = container.calendar_service()
+
 
 router = Router()
 
-event_repo = container.event_repository()
 
 
 def is_admin(user_id: int) -> bool:
@@ -34,7 +33,7 @@ async def admin_bookings(message: Message) -> None:
     if not is_admin(message.from_user.id):
         await message.answer(t(lang, "admin.no_access"))
         return
-    bookings = calendar.list_all_bookings()
+    bookings = container.calendar_service().list_all_bookings()
     if not bookings:
         await message.answer("No bookings")
         return
@@ -50,7 +49,7 @@ async def admin_poster(message: Message) -> None:
     if not is_admin(message.from_user.id):
         await message.answer(t(lang, "admin.no_access"))
         return
-    poster = await event_repo.get_all()
+    poster = await container.event_repository().get_all()
     if not poster:
         await message.answer("Poster empty")
         return

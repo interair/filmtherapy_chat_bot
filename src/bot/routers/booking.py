@@ -21,10 +21,6 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 
-calendar = container.calendar_service()
-loc_repo = container.location_repository()
-session_loc_repo = container.session_locations_repository()
-booking_flow = BookingFlow(calendar, loc_repo)
 
 # Centralized constants and helpers
 SESSION_TYPES = ("Песочная терапия", "Очно", "Онлайн")
@@ -144,7 +140,7 @@ async def _get_locations_list(session_type: str | None) -> list[str]:
     # Try to use per-type mapping first
     try:
         if session_type:
-            m = await session_loc_repo.get_map()
+            m = await container.session_locations_repository().get_map()
             arr = m.get(str(session_type).strip())
             if isinstance(arr, list) and len(arr) > 0:
                 return [str(x) for x in arr]
@@ -152,7 +148,7 @@ async def _get_locations_list(session_type: str | None) -> list[str]:
         pass
     # Fallback to all known locations from repo
     try:
-        models = await loc_repo.get_all()
+        models = await container.location_repository().get_all()
         locs = [l.name for l in models]
         if locs:
             return locs
@@ -218,7 +214,7 @@ async def show_dates(event: Message | CallbackQuery, state: FSMContext):
     session_type = data.get("session_type")
     location = data.get("location")
 
-    dates = await booking_flow.get_available_dates(
+    dates = await container.booking_flow().get_available_dates(
         session_type,
         location,
     )
@@ -271,7 +267,7 @@ async def paginate_dates(cb: CallbackQuery, state: FSMContext) -> None:
     dates = data.get("_dates_cache") if isinstance(data, dict) else None
     if not dates:
         try:
-            dates = await booking_flow.get_available_dates(session_type, location)
+            dates = await container.booking_flow().get_available_dates(session_type, location)
         except Exception:
             logger.exception("Failed to recompute available dates for pagination")
             dates = []
@@ -336,7 +332,7 @@ async def show_times(cb: CallbackQuery, state: FSMContext):
 
     try:
         logger.info("Booking: fetching times for user=%s date=%s type=%s loc=%s", getattr(cb.from_user, "id", None), date, stype, loc)
-        slots = await booking_flow.get_available_times(date, stype, loc)
+        slots = await container.booking_flow().get_available_times(date, stype, loc)
         logger.info("Booking: found %s slots for date=%s", len(slots) if slots is not None else 0, date)
     except Exception:
         logger.exception("Booking: failed to fetch times for date=%s", date)
@@ -395,7 +391,7 @@ async def choose_time(cb: CallbackQuery, state: FSMContext) -> None:
     )
 
     try:
-        booking = await booking_flow.create_booking(
+        booking = await container.booking_flow().create_booking(
             cb.from_user.id,
             cb.from_user.full_name,
             booking_data,
@@ -454,7 +450,7 @@ async def cancel_booking(cb: CallbackQuery) -> None:
     lang = user_lang(cb)
     booking_id = cb.data.split(":", 1)[1]
     try:
-        calendar.cancel_booking(booking_id)
+        container.calendar_service().cancel_booking(booking_id)
         await cb.message.edit_text(t(lang, "book.canceled"))
     except PermissionError:
         await cb.answer(t(lang, "book.cannot_cancel"), show_alert=True)
@@ -472,7 +468,7 @@ async def my_bookings(message: Message) -> None:
     # Collect session bookings (consultations)
     session_items = []
     try:
-        session_items = calendar.list_user_bookings(uid) or []
+        session_items = container.calendar_service().list_user_bookings(uid) or []
     except Exception:
         session_items = []
 
