@@ -5,7 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONOPTIMIZE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PYTHONPATH="/app"
+    PYTHONPATH="/app" \
+    PYTHONNOUSERSITE=1
 
 # Create user and workdir in one layer
 RUN useradd -m -u 10001 appuser && mkdir -p /app
@@ -15,7 +16,9 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir --prefer-binary -r requirements.txt \
     && LIB="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" \
+    && STDLIB="$(python -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')" \
     && python -m compileall -q -o 1 "$LIB" \
+    && python -m compileall -q -o 1 "$STDLIB" \
     && find "$LIB" -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # Copy source and early logging helper
