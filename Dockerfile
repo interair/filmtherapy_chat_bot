@@ -7,30 +7,28 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONOPTIMIZE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH="/app"
 
-# Create user and workdir
-RUN useradd -m -u 10001 appuser
+# Create user and workdir in one layer
+RUN useradd -m -u 10001 appuser && mkdir -p /app
 WORKDIR /app
 
-# Copy only requirements first for better layer caching
+# Install dependencies with optimizations
 COPY requirements.txt ./
-RUN python -m pip install --no-cache-dir --prefer-binary -r requirements.txt
+RUN python -m pip install --no-cache-dir --prefer-binary -r requirements.txt \
+    && python -m compileall -q -o 1 /usr/local/lib/python3.11/site-packages \
+    && find /usr/local/lib/python3.11/site-packages -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
 
-# Copy the application source
+# Copy source and early logging helper
 COPY src ./src
+COPY sitecustomize.py ./
 
-# Precompile project bytecode to speed up startup
-RUN python -m compileall -q /app/src
-
-# Create runtime dirs and set permissions
-RUN mkdir -p logs data \
+# Compile everything and set permissions in one layer
+RUN python -m compileall -q -o 1 /app/src /app/sitecustomize.py \
+    && mkdir -p logs data \
     && chown -R appuser:appuser /app
 
 USER appuser
 
-# Expose no ports (bot uses Telegram long polling outbound)
-# HEALTHCHECK can be added if using webhooks
-
-# The bot reads configuration from environment variables (.env can be passed via --env-file)
 CMD ["python", "-m", "src.main"]
