@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import List, Optional
-import logging
 
 from .models import Event
 from .repositories import EventRepository

@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-import logging
 import contextlib
-import asyncio  # added
+import logging
+from datetime import datetime, timezone
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import Message, CallbackQuery
 
-from ...i18n.texts import t
-from ...container import container
-from ..utils import user_lang, ik_kbd
-from ..booking_flow import BookingFlow, BookingData
+from ..booking_flow import BookingData
 from ..callbacks import encode_stype, encode_loc, decode_stype, decode_loc
+from ..utils import user_lang, ik_kbd
+from ...container import container
 from ...exceptions import ValidationError
+from ...i18n.texts import t
 
 logger = logging.getLogger(__name__)
 
@@ -457,7 +456,6 @@ async def cancel_booking(cb: CallbackQuery) -> None:
     await cb.answer()
 
 
-
 @router.message(F.text.in_({"Мои записи", "My bookings", "📒 Мои записи", "📒 My bookings"}))
 async def my_bookings(message: Message) -> None:
     lang = user_lang(message)
@@ -524,7 +522,6 @@ async def my_bookings(message: Message) -> None:
                 when = f"{date_s} {time_s}"
                 # Attempt to parse for sorting
                 try:
-                    from datetime import datetime
                     ts = datetime.fromisoformat(start_iso.replace("Z", "+00:00")).timestamp()
                 except Exception:
                     ts = 0.0

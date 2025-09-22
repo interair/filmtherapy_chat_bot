@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
-import logging
 
-from ..exceptions import ValidationError
 from .repositories import BookingRepository, ScheduleRepository
+from ..exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +15,6 @@ LOCATIONS = [
     "Van Eeghenlaan 27",
     "Binnenkant 24",
 ]
-
-
 
 @dataclass
 class Slot:

@@ -7,10 +7,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-try:
-    import orjson as _orjson
-except ImportError:
-    _orjson = None
 
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
@@ -43,6 +39,7 @@ from .dependencies import (
 from ..services.event_service import EventService
 from ..services.models import SessionType
 from ..exceptions import BotException
+from ..services.storage import read_json, write_json
 
 logger = logging.getLogger(__name__)
 
@@ -121,31 +118,21 @@ def html_escape(s: str) -> str:
 
 
 def _read_texts_overrides() -> dict:
+    """Read texts overrides using shared storage helpers to avoid duplication."""
     try:
-        if _orjson:
-            with open(TEXTS_PATH, "rb") as f:
-                data = _orjson.loads(f.read())
-        else:
-            with open(TEXTS_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
+        data = read_json(TEXTS_PATH, default={})
         if not isinstance(data, dict):
             return {"RU": {}, "EN": {}}
         return {"RU": dict(data.get("RU", {})), "EN": dict(data.get("EN", {}))}
-    except (OSError, ValueError, json.JSONDecodeError):
+    except Exception:
         logger.debug("Failed to read texts overrides from %s", TEXTS_PATH, exc_info=True)
         return {"RU": {}, "EN": {}}
 
 
 def _write_texts_overrides(data: dict) -> None:
+    """Write texts overrides using shared storage helpers to avoid duplication."""
     TEXTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = str(TEXTS_PATH) + ".tmp"
-    if _orjson:
-        with open(tmp, "wb") as f:
-            f.write(_orjson.dumps(data, option=_orjson.OPT_INDENT_2))
-    else:
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, TEXTS_PATH)
+    write_json(TEXTS_PATH, data)
 
 
 def _all_i18n_keys() -> list[str]:
@@ -422,35 +409,9 @@ async def web_quiz_save(
     _: None = Depends(verify_web_auth),
 ):
     data = await request.form()
-    # Parse moods
-    moods_in = []
-    for line in str(data.get("moods", "")).splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if "|" in line:
-            title, code = line.split("|", 1)
-        else:
-            title, code = line, line.lower().replace(" ", "_")
-        title = title.strip()
-        code = code.strip()
-        if title and code:
-            moods_in.append({"title": title, "code": code})
-
-    # Parse companies
-    companies_in = []
-    for line in str(data.get("companies", "")).splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if "|" in line:
-            title, code = line.split("|", 1)
-        else:
-            title, code = line, line.lower().replace(" ", "_")
-        title = title.strip()
-        code = code.strip()
-        if title and code:
-            companies_in.append({"title": title, "code": code})
+    # Parse moods/companies using shared helper
+    moods_in = parse_title_code_lines(str(data.get("moods", "")))
+    companies_in = parse_title_code_lines(str(data.get("companies", "")))
 
     # Parse recs
     recs_in = {}
@@ -913,3 +874,24 @@ async def web_bookings_delete(request: Request, _: None = Depends(verify_web_aut
             # Ignore errors for idempotency
             pass
     return RedirectResponse(url="/bookings?deleted=1", status_code=302)
+
+
+
+def parse_title_code_lines(text: str) -> list[dict]:
+    """Parse user input lines into list of {title, code} dicts.
+    Each non-empty line may be either "Title|code" or a single title (code auto-generated).
+    """
+    items: list[dict] = []
+    for line in str(text).splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if "|" in line:
+            title, code = line.split("|", 1)
+        else:
+            title, code = line, line.lower().replace(" ", "_")
+        title = title.strip()
+        code = code.strip()
+        if title and code:
+            items.append({"title": title, "code": code})
+    return items

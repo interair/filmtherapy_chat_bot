@@ -5,9 +5,7 @@ from datetime import datetime, timedelta
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from ..config import settings
-from ..i18n.texts import t
 from ..container import container
-
 
 
 def user_lang(message: Message | CallbackQuery) -> str:

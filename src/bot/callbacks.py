@@ -4,6 +4,7 @@ from typing import Optional
 
 from ..container import container
 
+
 # Centralized helpers for compact callback data encoding/decoding.
 # This keeps router modules smaller and avoids scattering mapping logic.
 

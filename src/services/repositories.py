@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import os
-from datetime import datetime, timezone, timedelta
-from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, List, Optional, Dict, Any, Type
-from pydantic import BaseModel, ValidationError as PydanticValidationError
-from functools import lru_cache
 import json as _json
+import os
+from abc import ABC, abstractmethod
+from datetime import datetime, timezone, timedelta
+from functools import lru_cache
+from typing import Generic, TypeVar, List, Optional, Dict, Any, Type
+
+from pydantic import BaseModel, ValidationError as PydanticValidationError
 
 try:
     import orjson as _orjson
@@ -118,7 +119,6 @@ class FirestoreRepository(Generic[T]):
         doc_id = str(getattr(obj, "id"))
         ref = self._col.document(doc_id)
         # Use get() with source=CACHE to check cache first, then server
-        from google.cloud.firestore import DocumentSnapshot
         if ref.get().exists:
             raise ValidationError(f"Item with id '{doc_id}' already exists")
         # Use Python-native types (datetime) so Firestore stores Timestamps, not strings
@@ -426,7 +426,8 @@ class ScheduleRepository:
     def __init__(self) -> None:
         self._doc = get_client().collection("config").document("schedule")
 
-    def _normalize_rules(self, rules_in: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    @staticmethod
+    def _normalize_rules(rules_in: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         out_rules: List[Dict[str, Any]] = []
         for it in rules_in or []:
             if not isinstance(it, dict):

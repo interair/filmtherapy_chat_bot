@@ -4,11 +4,10 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from ...config import settings
-from ...i18n.texts import t
-from ...container import container
 from ..utils import user_lang
-
+from ...config import settings
+from ...container import container
+from ...i18n.texts import t
 
 router = Router()
 

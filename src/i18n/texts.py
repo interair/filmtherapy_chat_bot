@@ -3,12 +3,9 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict
+from ..services.storage import read_json
 
-try:
-    import orjson as _orjson
-except Exception:
-    _orjson = None
 
 # Small in-memory cache for overrides to avoid disk I/O on each lookup
 _OVERRIDES_CACHE: Dict[str, Dict[str, str]] = {"RU": {}, "EN": {}}
@@ -154,22 +151,20 @@ def _load_overrides() -> Dict[str, Dict[str, str]]:
         mtime = os.path.getmtime(TEXTS_OVERRIDES_PATH)
         if _OVERRIDES_MTIME == mtime:
             return _OVERRIDES_CACHE
-        if _orjson:
-            with open(TEXTS_OVERRIDES_PATH, "rb") as f:
-                data = _orjson.loads(f.read())
-        else:
-            with open(TEXTS_OVERRIDES_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        # Sanitize structure
-        ru = data.get("RU") or {}
-        en = data.get("EN") or {}
-        if not isinstance(ru, dict) or not isinstance(en, dict):
+        data = read_json(TEXTS_OVERRIDES_PATH, default={})
+        if not isinstance(data, dict):
             _OVERRIDES_CACHE = {"RU": {}, "EN": {}}
         else:
-            # Cast values to str
-            ru = {str(k): str(v) for k, v in ru.items()}
-            en = {str(k): str(v) for k, v in en.items()}
-            _OVERRIDES_CACHE = {"RU": ru, "EN": en}
+            # Sanitize structure
+            ru = data.get("RU") or {}
+            en = data.get("EN") or {}
+            if not isinstance(ru, dict) or not isinstance(en, dict):
+                _OVERRIDES_CACHE = {"RU": {}, "EN": {}}
+            else:
+                # Cast values to str
+                ru = {str(k): str(v) for k, v in ru.items()}
+                en = {str(k): str(v) for k, v in en.items()}
+                _OVERRIDES_CACHE = {"RU": ru, "EN": en}
         _OVERRIDES_MTIME = mtime
         return _OVERRIDES_CACHE
     except Exception:

@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from dependency_injector import containers, providers
-from concurrent.futures import ThreadPoolExecutor
 import os
+from concurrent.futures import ThreadPoolExecutor
 
+from dependency_injector import containers, providers
+
+from .bot.booking_flow import BookingFlow
+from .config import settings
+from .services.calendar_service import CalendarService
+from .services.event_service import EventService
+from .services.metrics_service import MetricsService, MetricsRepository
 from .services.repositories import (
     EventRepository,
     LocationRepository,
@@ -15,11 +21,6 @@ from .services.repositories import (
     EventRegistrationRepository,
     SessionLocationsRepository,
 )
-from .services.calendar_service import CalendarService
-from .services.event_service import EventService
-from .services.metrics_service import MetricsService, MetricsRepository
-from .config import settings
-from .bot.booking_flow import BookingFlow
 
 
 class Container(containers.DeclarativeContainer):

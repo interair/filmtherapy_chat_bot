@@ -26,10 +26,10 @@ if [ -z "${TELEGRAM_TOKEN:-}" ] && [ ! -f .env ]; then
   exit 1
 fi
 
-# Choose Python interpreter: prefer 3.11 to avoid building incompatible C-extensions on 3.13
+# Choose Python interpreter: prefer 3.13
 choose_python() {
-  if command -v python3.11 >/dev/null 2>&1; then
-    echo "python3.11"
+  if command -v python3.13 >/dev/null 2>&1; then
+    echo "python3.13"
     return
   fi
   if command -v python3 >/dev/null 2>&1; then
@@ -45,32 +45,12 @@ choose_python() {
 
 PY=$(choose_python)
 if [ -z "$PY" ]; then
-  echo "No Python interpreter found. Please install Python 3.11 or Docker." >&2
+  echo "No Python interpreter found. Please install Python 3.13 or Docker." >&2
   exit 1
 fi
 
-# Check version and prefer Docker if running on Python >= 3.13 without 3.11 available
+# Determine interpreter version for venv management
 PYVER=$($PY -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")')
-if [ "$PYVER" != "3.11" ] && [ "$PYVER" \> "3.12" ]; then
-  # Try to fallback to Docker
-  if command -v docker >/dev/null 2>&1; then
-    echo "Detected Python $PYVER. Building and running Docker image to avoid local build issues..." >&2
-    docker build -t gantich-chat-bot:dev .
-    # Pass .env if present
-    DOCKER_ENV=()
-    if [ -f .env ]; then
-      DOCKER_ENV+=(--env-file ./.env)
-    fi
-    exec docker run --rm \
-      -e IN_DOCKER=1 \
-      -v "$(pwd)/logs:/app/logs" \
-      "${DOCKER_ENV[@]}" \
-      gantich-chat-bot:dev
-  else
-    echo "Python $PYVER detected and Docker not available. Please install Python 3.11 to run locally" >&2
-    exit 1
-  fi
-fi
 
 # Create venv if missing or if created with a different Python minor version
 VENV_PY=".venv/bin/python"

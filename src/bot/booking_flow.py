@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
-from datetime import date
 from ..services.calendar_service import Slot
 
 

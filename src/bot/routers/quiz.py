@@ -3,9 +3,9 @@ from __future__ import annotations
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 
-from ...i18n.texts import t
-from ...container import container
 from ..utils import user_lang, ik_kbd
+from ...container import container
+from ...i18n.texts import t
 
 router = Router()
 

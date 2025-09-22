@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, FSInputFile
 from pathlib import Path
 
-from ...i18n.texts import t
-from ...container import container
-from ...services.storage import DATA_DIR
+from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery, FSInputFile
+
 from ..utils import user_lang, ik_kbd
+from ...container import container
+from ...i18n.texts import t
+from ...services.storage import DATA_DIR
 
 router = Router()
 

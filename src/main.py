@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import contextlib
+import logging
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from .config import settings
-from .bot.routers import start as start_router
 from .bot.routers import booking, cinema, quiz, admin
+from .bot.routers import start as start_router
 from .bot.webapp import start_web, mark_bot_running
+from .config import settings
 
 # Ensure runtime directories exist before configuring logging
 ROOT_DIR = Path(__file__).resolve().parents[1]

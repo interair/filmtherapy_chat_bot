@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+
 from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, CallbackQuery, FSInputFile
 
-from ...i18n.texts import t
-from ...keyboards import main_menu
 from ..utils import user_lang, lang_kbd
 from ...container import container
+from ...i18n.texts import t
+from ...keyboards import main_menu
 
 router = Router()
 

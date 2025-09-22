@@ -18,7 +18,6 @@ venv/
 *.iml
 
 # OS files
-.DS_Store
 Thumbs.db
 
 # Environment files (never commit real secrets)

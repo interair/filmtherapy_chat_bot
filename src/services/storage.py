@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import json
+import logging
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Optional, Generator
-import logging
+from typing import Any, Generator
 
-try:
-    import orjson as _orjson
-except Exception:
-    _orjson = None
+import orjson as _orjson
 
 logger = logging.getLogger(__name__)
 
@@ -25,32 +21,19 @@ def read_json(path: str | Path, default: Any) -> Any:
     if not filepath.exists():
         return default
     try:
-        if _orjson:
-            with open(filepath, "rb") as f:
-                return _orjson.loads(f.read())
-        else:
-            with open(filepath, "r", encoding="utf-8") as f:
-                return json.load(f)
+        with open(filepath, "rb") as f:
+            return _orjson.loads(f.read())
     except Exception:
-        logger.exception("read_json: primary read failed for %s", filepath)
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            logger.exception("read_json: fallback json.load failed for %s", filepath)
-            return default
+        logger.exception("read_json: orjson read failed for %s", filepath)
+        return default
 
 
 def write_json(path: str | Path, data: Any) -> None:
     filepath = Path(path)
     storage = Storage(filepath.parent)
     with storage._atomic_write(filepath) as tmp_path:
-        if _orjson:
-            with open(tmp_path, "wb") as f:
-                f.write(_orjson.dumps(data, option=(_orjson.OPT_INDENT_2 | _orjson.OPT_NON_STR_KEYS)))
-        else:
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+        with open(tmp_path, "wb") as f:
+            f.write(_orjson.dumps(data, option=(_orjson.OPT_INDENT_2 | _orjson.OPT_NON_STR_KEYS)))
 
 
 # Simple schemas stored as plain dicts
