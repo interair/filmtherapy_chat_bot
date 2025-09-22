@@ -8,15 +8,13 @@ from ..config import settings
 from ..i18n.texts import t
 from ..container import container
 
-# Resolve repository via DI container (singleton)
-_user_lang_repo = container.user_language_repository()
 
 
 def user_lang(message: Message | CallbackQuery) -> str:
     try:
         uid = message.from_user.id if message and message.from_user else None
         if uid:
-            pref = _user_lang_repo.get_sync(uid)
+            pref = container.user_language_repository().get_sync(uid)
             if pref:
                 return pref
         return (message.from_user.language_code or settings.default_lang) if message and message.from_user else settings.default_lang

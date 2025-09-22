@@ -11,14 +11,11 @@ from ..utils import user_lang, ik_kbd
 
 router = Router()
 
-event_repo = container.event_repository()
-reg_repo = container.event_registration_repository()
-
 
 @router.message(F.text.in_({"Киноклуб", "Film club", "🎬 Киноклуб", "🎬 Film club"}))
 async def film_club(message: Message) -> None:
     lang = user_lang(message)
-    poster = await event_repo.get_upcoming()
+    poster = await container.event_repository().get_upcoming()
     if not poster:
         await message.answer(t(lang, "cinema.poster"))
         return
@@ -69,11 +66,11 @@ async def register_film(cb: CallbackQuery) -> None:
         await cb.answer("Invalid user", show_alert=True)
         return
     try:
-        exists = await reg_repo.get_one(event_id, uid)
+        exists = await container.event_registration_repository().get_one(event_id, uid)
         if exists:
             msg = t(lang, "cinema.already_registered")
         else:
-            await reg_repo.add(event_id, uid, name)
+            await container.event_registration_repository().add(event_id, uid, name)
             msg = t(lang, "cinema.registered")
         kbd = ik_kbd([[ 
             ("💳 " + t(lang, "book.pay_button"), f"pay_event:{event_id}"),
@@ -95,7 +92,7 @@ async def pay_event(cb: CallbackQuery) -> None:
     # Resolve event price or fallback to i18n-configured cinema price
     price_val: float | None = None
     try:
-        ev = await event_repo.get_by_id(event_id) if event_id else None
+        ev = await container.event_repository().get_by_id(event_id) if event_id else None
         if ev and getattr(ev, "price", None) is not None:
             price_val = float(getattr(ev, "price"))
     except Exception:
@@ -143,7 +140,7 @@ async def cancel_event(cb: CallbackQuery) -> None:
         await cb.answer("Invalid user", show_alert=True)
         return
     try:
-        await reg_repo.delete(event_id, uid)
+        await container.event_registration_repository().delete(event_id, uid)
         try:
             await cb.message.edit_text(t(lang, "cinema.canceled"))
         except Exception:

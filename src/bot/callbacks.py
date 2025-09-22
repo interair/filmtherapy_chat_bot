@@ -7,15 +7,13 @@ from ..container import container
 # Centralized helpers for compact callback data encoding/decoding.
 # This keeps router modules smaller and avoids scattering mapping logic.
 
-loc_repo = container.location_repository()
-
 
 async def _get_locations_list() -> list[str]:
     """Return a stable list of location names used for compact encoding.
     Falls back to built-in defaults if repository is unavailable.
     """
     try:
-        models = await loc_repo.get_all()
+        models = await container.location_repository().get_all()
         locs = [l.name for l in models]
         if locs:
             return locs
