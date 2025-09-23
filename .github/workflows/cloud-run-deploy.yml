@@ -135,7 +135,7 @@ jobs:
             --env-vars-file="${ENV_FILE}" \
             --set-secrets "TELEGRAM_TOKEN=${SECRET_TELEGRAM_TOKEN}:latest" \
             --set-secrets "WEB_USERNAME=${SECRET_WEB_USERNAME}:latest" \
-            --set-secrets "WEB_PASSWORD=${SECRET_WEB_PASSWORD}:latest"
+            --set-secrets "WEB_PASSWORD=${SECRET_WEB_PASSWORD}:latest" \
             --set-secrets "TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET}:latest"
 
           echo "Deployed ${SERVICE} in ${REGION} with image ${IMAGE_URI} (secrets via Secret Manager)"
