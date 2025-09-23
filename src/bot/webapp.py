@@ -145,12 +145,111 @@ def _is_multiline(key: str, value: str) -> bool:
 templates.env.globals["is_multiline"] = _is_multiline
 
 
+class QueryFlags:
+    """Common query flags like saved=1, deleted=1, etc., parsed uniformly.
+    Use as a FastAPI dependency: flags: QueryFlags = Depends().
+    """
+    def __init__(self, saved: int = 0, deleted: int = 0, added: int = 0, updated: int = 0, created: int = 0):
+        self.saved = (saved == 1)
+        self.deleted = (deleted == 1)
+        self.added = (added == 1)
+        self.updated = (updated == 1)
+        self.created = (created == 1)
+
+
+def _get_commit_hash() -> str:
+    """Resolve commit/version hash from env or files.
+
+    Checks several env vars commonly used in CI/CD and falls back to reading
+    commit.txt either from project root or /app/commit.txt. Returns "unknown"
+    if nothing is found.
+    """
+    commit = (
+        os.getenv("GIT_COMMIT")
+        or os.getenv("COMMIT_SHA")
+        or os.getenv("SOURCE_COMMIT")
+        or os.getenv("COMMIT")
+    )
+    if not commit:
+        for p in (ROOT_DIR / "commit.txt", Path("/app/commit.txt")):
+            try:
+                if p.exists():
+                    commit = p.read_text(encoding="utf-8").strip() or None
+                    if commit:
+                        break
+            except OSError:
+                logger.debug("Failed to read commit from %s", p, exc_info=True)
+    return commit or "unknown"
+
+
+def b64_url_encode(s: str) -> str:
+    """URL-safe base64 encode without padding; return empty string on error."""
+    try:
+        return base64.urlsafe_b64encode(s.encode("utf-8")).decode("ascii").rstrip("=")
+    except Exception:
+        logger.debug("Failed to base64-encode: %r", s, exc_info=True)
+        return ""
+
+
+def b64_url_decode(s: str) -> str:
+    """URL-safe base64 decode with auto padding; return empty string on error."""
+    try:
+        pad = "=" * (-len(s) % 4)
+        return base64.urlsafe_b64decode((s + pad).encode("ascii")).decode("utf-8")
+    except Exception:
+        logger.debug("Failed to base64-decode: %r", s, exc_info=True)
+        return ""
+
+
+async def save_upload(
+    file_field,
+    dst_dir: Path,
+    base_name: str | None = None,
+    allowed_exts: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp"),
+    max_mb: int = 10,
+    oversize_raises: bool = False,
+) -> str | None:
+    """Save an UploadFile-like object to dst_dir and return saved filename.
+
+    - Detects extension; if not allowed, defaults to .jpg
+    - Limits size to max_mb
+    - When oversize_raises=True, raises ValueError("FILE_TOO_LARGE") on oversize
+      instead of silently skipping
+    """
+    if not file_field or not getattr(file_field, 'filename', ''):
+        return None
+    filename = getattr(file_field, 'filename', '')
+    # Read content (UploadFile has async read())
+    content: bytes
+    if hasattr(file_field, 'read'):
+        content = await file_field.read()  # type: ignore
+    else:
+        content = bytes(file_field)
+    if not isinstance(content, (bytes, bytearray)) or len(content) == 0:
+        return None
+    max_bytes = max_mb * 1024 * 1024
+    if len(content) > max_bytes:
+        if oversize_raises:
+            raise ValueError("FILE_TOO_LARGE")
+        return None
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in allowed_exts:
+        ext = ".jpg"
+    stem = base_name if base_name else os.path.splitext(os.path.basename(filename))[0]
+    safe_name = f"{stem}{ext}"
+    dst = dst_dir / safe_name
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    with open(dst, "wb") as out:
+        out.write(content)
+    return safe_name
+
+
 @app.get("/", response_class=HTMLResponse)
-async def web_index(request: Request, metrics = Depends(get_metrics_service), _: None = Depends(verify_web_auth)):
-    saved = request.query_params.get("saved") == "1"
-    deleted = request.query_params.get("deleted") == "1"
-    added = request.query_params.get("added") == "1"
-    updated = request.query_params.get("updated") == "1"
+async def web_index(request: Request, metrics = Depends(get_metrics_service), flags: QueryFlags = Depends(), _: None = Depends(verify_web_auth)):
+    saved = flags.saved
+    deleted = flags.deleted
+    added = flags.added
+    updated = flags.updated
     time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     overview = metrics.today_overview()
     top_features = metrics.feature_usage(days=7, top_n=3)
@@ -209,23 +308,8 @@ async def web_system(request: Request, _: None = Depends(verify_web_auth)):
     ]
     runtime_env = {k: os.getenv(k) for k in extra_env_keys if os.getenv(k) is not None}
 
-    # Resolve commit/version information
-    commit = (
-        os.getenv("GIT_COMMIT")
-        or os.getenv("COMMIT_SHA")
-        or os.getenv("SOURCE_COMMIT")
-        or os.getenv("COMMIT")
-    )
-    if not commit:
-        # Try to read from a file if provided during build/deploy
-        for p in (ROOT_DIR / "commit.txt", Path("/app/commit.txt")):
-            try:
-                if p.exists():
-                    commit = p.read_text(encoding="utf-8").strip() or None
-                    break
-            except OSError:
-                logger.debug("Failed to read commit from %s", p, exc_info=True)
-    commit = commit or "unknown"
+    # Resolve commit/version information via helper
+    commit = _get_commit_hash()
 
     context = {
         "request": request,
@@ -321,20 +405,7 @@ async def web_events_save(
     photo_filename: Optional[str] = None
     file_field = data.get("photo")
     try:
-        if file_field and getattr(file_field, 'filename', ''):
-            # Read bytes (UploadFile has async read)
-            content = await file_field.read() if hasattr(file_field, 'read') else bytes(file_field)  # type: ignore
-            # Basic size limit: 10 MB
-            if len(content) <= 10 * 1024 * 1024:
-                ext = os.path.splitext(getattr(file_field, 'filename', ''))[1].lower()
-                if ext not in (".jpg", ".jpeg", ".png", ".webp"):
-                    ext = ".jpg"
-                safe_name = f"{event_id}{ext}"
-                dst = ROOT_DIR / "data" / safe_name
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                with open(dst, "wb") as out:
-                    out.write(content)
-                photo_filename = safe_name
+        photo_filename = await save_upload(file_field, ROOT_DIR / "data", base_name=str(event_id))
     except (OSError, ValueError, TypeError):
         # Ignore upload errors and continue without photo
         photo_filename = None
@@ -426,8 +497,8 @@ async def web_quiz_save(
 
 
 @app.get("/bookings", response_class=HTMLResponse)
-async def web_bookings(request: Request, _: None = Depends(verify_web_auth)):
-    deleted = request.query_params.get("deleted") == "1"
+async def web_bookings(request: Request, flags: QueryFlags = Depends(), _: None = Depends(verify_web_auth)):
+    deleted = flags.deleted
     raw = container.calendar_service().list_all_bookings()
     items = []
     for booking in raw:
@@ -466,9 +537,10 @@ async def web_schedule(
     request: Request,
     sched_repo: ScheduleRepository = Depends(get_schedule_repository),
     loc_repo: LocationRepository = Depends(get_location_service),
+    flags: QueryFlags = Depends(),
     _: None = Depends(verify_web_auth),
 ):
-    saved = request.query_params.get("saved") == "1"
+    saved = flags.saved
     cfg = await sched_repo.get()
     rules = cfg.get("rules", []) if isinstance(cfg, dict) else []
     # Load available locations for dropdown
@@ -547,8 +619,8 @@ async def web_schedule_save(
 
 
 @app.get("/i18n", response_class=HTMLResponse)
-async def web_i18n(request: Request, _: None = Depends(verify_web_auth)):
-    saved_flag = request.query_params.get("saved")
+async def web_i18n(request: Request, flags: QueryFlags = Depends(), _: None = Depends(verify_web_auth)):
+    saved_flag = flags.saved
     overrides = _read_texts_overrides()
     keys = _all_i18n_keys()
     ru_vals: dict[str, str] = {}
@@ -600,10 +672,11 @@ async def start_web(bot: Bot | None = None, dp: Dispatcher | None = None) -> Non
 async def web_about(
     request: Request,
     about_repo: AboutRepository = Depends(get_about_repository),
+    flags: QueryFlags = Depends(),
     _: None = Depends(verify_web_auth),
 ):
-    saved = request.query_params.get("saved") == "1"
-    deleted = request.query_params.get("deleted") == "1"
+    saved = flags.saved
+    deleted = flags.deleted
     cfg = await about_repo.get()
     fn = cfg.get("photo") if isinstance(cfg, dict) else None
     photo = fn if isinstance(fn, str) and fn else ""
@@ -628,26 +701,17 @@ async def web_about_save(
     if not file_field:
         return RedirectResponse(url="/about", status_code=302)
     try:
-        filename = getattr(file_field, 'filename', '') or 'about_photo'
-        # Read bytes (UploadFile has async read)
-        if hasattr(file_field, 'read'):
-            content = await file_field.read()  # type: ignore
-        else:
-            content = bytes(file_field)
-        # Basic size limit: 10 MB
-        if len(content) > 10 * 1024 * 1024:
-            return PlainTextResponse(content="File too large", status_code=400)
-        ext = os.path.splitext(filename)[1].lower()
-        if ext not in (".jpg", ".jpeg", ".png", ".webp"):
-            ext = ".jpg"
-        safe_name = f"about_photo{ext}"
-        dst = ROOT_DIR / "data" / safe_name
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        with open(dst, "wb") as out:
-            out.write(content)
+        safe_name = await save_upload(file_field, ROOT_DIR / "data", base_name="about_photo", oversize_raises=True)
+        if not safe_name:
+            return RedirectResponse(url="/about", status_code=302)
         await about_repo.set_photo(safe_name)
-        logger.info("Web: about/save file=%s bytes=%d", safe_name, len(content) if isinstance(content, (bytes, bytearray)) else -1)
+        logger.info("Web: about/save file=%s", safe_name)
         return RedirectResponse(url="/about?saved=1", status_code=302)
+    except ValueError as e:
+        if str(e) == "FILE_TOO_LARGE":
+            return PlainTextResponse(content="File too large", status_code=400)
+        logger.exception("Web: about/save value error")
+        return PlainTextResponse(content=f"Upload failed: {html_escape(str(e))}", status_code=500)
     except Exception as e:
         logger.exception("Web: about/save failed")
         return PlainTextResponse(content=f"Upload failed: {html_escape(str(e))}", status_code=500)
@@ -672,23 +736,13 @@ async def web_about_cinema_add(
         if not file_field or not getattr(file_field, 'filename', ''):
             continue
         try:
-            name = getattr(file_field, 'filename', '')
-            content = await file_field.read() if hasattr(file_field, 'read') else bytes(file_field)  # type: ignore
-            if not isinstance(content, (bytes, bytearray)) or len(content) == 0:
-                continue
-            if len(content) > 10 * 1024 * 1024:
-                continue
-            ext = os.path.splitext(name)[1].lower()
-            if ext not in (".jpg", ".jpeg", ".png", ".webp"):
-                ext = ".jpg"
             ts = datetime.now().strftime('%Y%m%d-%H%M%S')
-            safe_name = f"cinema_{ts}_{idx}{ext}"
-            dst = ROOT_DIR / "data" / safe_name
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            with open(dst, "wb") as out:
-                out.write(content)
+            base = f"cinema_{ts}_{idx}"
+            safe_name = await save_upload(file_field, ROOT_DIR / "data", base_name=base)
+            if not safe_name:
+                continue
             await about_repo.add_cinema_photo(safe_name)
-            logger.info("Web: about/cinema/add file=%s bytes=%d", safe_name, len(content))
+            logger.info("Web: about/cinema/add file=%s", safe_name)
             saved_any = True
         except Exception:
             logger.exception("Web: about/cinema/add failed for a file")
@@ -724,19 +778,16 @@ async def web_about_cinema_delete(
 async def web_locations(
     request: Request,
     loc_repo: LocationRepository = Depends(get_location_service),
+    flags: QueryFlags = Depends(),
     _: None = Depends(verify_web_auth),
 ):
-    saved = request.query_params.get("saved") == "1"
-    deleted = request.query_params.get("deleted") == "1"
+    saved = flags.saved
+    deleted = flags.deleted
     loc_models = await loc_repo.get_all()
     locs = [l.name for l in loc_models]
     items = []
     for s in locs:
-        try:
-            enc = base64.urlsafe_b64encode(s.encode("utf-8")).decode("ascii").rstrip("=")
-        except Exception:
-            logger.debug("Failed to base64-encode location name: %r", s, exc_info=True)
-            enc = ""
+        enc = b64_url_encode(s)
         items.append({"name": s, "enc": enc})
     return templates.TemplateResponse("locations.html", {
         "request": request,
@@ -771,12 +822,9 @@ async def web_locations_delete(
     _: None = Depends(verify_web_auth),
 ):
     enc = val
-    try:
-        pad = "=" * (-len(enc) % 4)
-        name = base64.urlsafe_b64decode((enc + pad).encode("ascii")).decode("utf-8")
-    except Exception:
+    name = b64_url_decode(enc)
+    if not name:
         logger.debug("Failed to base64-decode location for delete: %r", enc, exc_info=True)
-        name = ""
     if name:
         logger.info("Web: locations/delete name=%s", name)
         await loc_repo.delete(name)
@@ -789,10 +837,11 @@ async def web_locations_by_type(
     request: Request,
     repo: SessionLocationsRepository = Depends(get_session_locations_repository),
     loc_repo: LocationRepository = Depends(get_location_service),
+    flags: QueryFlags = Depends(),
     _: None = Depends(verify_web_auth),
 ):
-    saved = request.query_params.get("saved") == "1"
-    deleted = request.query_params.get("deleted") == "1"
+    saved = flags.saved
+    deleted = flags.deleted
     m = await repo.get_map()
     # Filter out any 'online' keys from the map (both ru/en)
     def _is_online_key(s: str) -> bool:
@@ -811,17 +860,9 @@ async def web_locations_by_type(
     for key in sorted(m.keys()):
         locs = []
         for s in m[key]:
-            try:
-                enc = base64.urlsafe_b64encode(s.encode("utf-8")).decode("ascii").rstrip("=")
-            except Exception:
-                logger.debug("Failed to base64-encode location in type map: %r", s, exc_info=True)
-                enc = ""
+            enc = b64_url_encode(s)
             locs.append({"name": s, "enc": enc})
-        try:
-            key_enc = base64.urlsafe_b64encode(key.encode("utf-8")).decode("ascii").rstrip("=")
-        except Exception:
-            logger.debug("Failed to base64-encode session type key: %r", key, exc_info=True)
-            key_enc = ""
+        key_enc = b64_url_encode(key)
         items.append({"type": key, "type_enc": key_enc, "locs": locs})
     # Build session types list excluding ONLINE
     session_types = [it.value for it in SessionType if getattr(SessionType, 'ONLINE', None) is None or it != SessionType.ONLINE]
@@ -864,14 +905,8 @@ async def web_locations_by_type_del(
     repo: SessionLocationsRepository = Depends(get_session_locations_repository),
     _: None = Depends(verify_web_auth),
 ):
-    def _dec(s: str) -> str:
-        try:
-            pad = "=" * (-len(s) % 4)
-            return base64.urlsafe_b64decode((s + pad).encode("ascii")).decode("utf-8")
-        except Exception:
-            return ""
-    t = _dec(type_enc)
-    name = _dec(val)
+    t = b64_url_decode(type_enc)
+    name = b64_url_decode(val)
     if t and name:
         logger.info("Web: locations/types/delete type=%s name=%s", t, name)
         try:

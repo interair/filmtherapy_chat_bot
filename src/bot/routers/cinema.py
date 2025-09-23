@@ -19,6 +19,47 @@ router = Router()
 class CinemaStates(StatesGroup):
     menu = State()
 
+
+def _format_event_poster_text(item, lang: str) -> str:
+    """Build caption/text for cinema event poster.
+    Includes title, when, place, price, optional description, and trims to 1024 chars.
+    """
+    # When formatting
+    try:
+        when_str = item.when.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        when_str = str(getattr(item, "when", ""))
+
+    # Price formatting (fallback to i18n "free")
+    price = getattr(item, "price", None)
+    try:
+        free_label = t(lang, "free")
+    except Exception:
+        free_label = "Free"
+    price_str = f"{price}€" if price is not None else free_label
+
+    text = (
+        f"<b>{getattr(item, 'title', '')}</b>\n"
+        f"{when_str}\n"
+        f"{getattr(item, 'place', '')}\n"
+        f"Цена: {price_str}"
+    )
+
+    # Optional description from Events (web)
+    desc = getattr(item, "description", None)
+    if desc:
+        try:
+            d = str(desc).strip()
+        except Exception:
+            d = None
+        if d:
+            text = f"{text}\n\n{d}"
+
+    # Telegram caption limit safeguard
+    if len(text) > 1024:
+        text = text[:1021] + "..."
+    return text
+
 # Main Film club button -> show submenu
 @router.message(F.text.in_({"Киноклуб", "Film club", "🎬 Киноклуб", "🎬 Film club"}))
 async def film_club_menu(message: Message, state: FSMContext) -> None:
@@ -37,28 +78,7 @@ async def film_club_schedule(message: Message) -> None:
         await message.answer(t(lang, "cinema.poster"))
         return
     for item in poster:
-        try:
-            when_str = item.when.strftime("%Y-%m-%d %H:%M")
-        except Exception:
-            when_str = str(getattr(item, 'when', ''))
-        price = getattr(item, 'price', None)
-        price_str = f"{price}€" if price is not None else t(lang, "free") if callable(t) else "Free"
-        text = f"<b>{getattr(item, 'title', '')}</b>\n{when_str}\n{getattr(item, 'place', '')}\nЦена: {price_str}"
-        
-        # Append optional description from Events (web) if present
-        desc = getattr(item, 'description', None)
-        if desc:
-            # Ensure description is a string and strip excessive whitespace
-            try:
-                d = str(desc).strip()
-            except Exception:
-                d = None
-            if d:
-                text = f"{text}\n\n{d}"
-        
-        # Truncate caption if it's too long (Telegram limit is 1024 characters)
-        if len(text) > 1024:
-            text = text[:1021] + "..."
+        text = _format_event_poster_text(item, lang)
             
         kbd = ik_kbd([[("📝 " + t(lang, "cinema.register"), f"reg:{getattr(item, 'id', '')}")]])
         photo_name = getattr(item, 'photo', None)
@@ -146,23 +166,7 @@ async def cb_cinema_schedule(cb: CallbackQuery) -> None:
         await cb.answer()
         return
     for item in poster:
-        try:
-            when_str = item.when.strftime("%Y-%m-%d %H:%M")
-        except Exception:
-            when_str = str(getattr(item, 'when', ''))
-        price = getattr(item, 'price', None)
-        price_str = f"{price}€" if price is not None else t(lang, "free") if callable(t) else "Free"
-        text = f"<b>{getattr(item, 'title', '')}</b>\n{when_str}\n{getattr(item, 'place', '')}\nЦена: {price_str}"
-        desc = getattr(item, 'description', None)
-        if desc:
-            try:
-                d = str(desc).strip()
-            except Exception:
-                d = None
-            if d:
-                text = f"{text}\n\n{d}"
-        if len(text) > 1024:
-            text = text[:1021] + "..."
+        text = _format_event_poster_text(item, lang)
         kbd = ik_kbd([[ ("📝 " + t(lang, "cinema.register"), f"reg:{getattr(item, 'id', '')}") ]])
         photo_name = getattr(item, 'photo', None)
         if photo_name:
