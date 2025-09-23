@@ -100,6 +100,77 @@ async def film_club_about(message: Message) -> None:
                     continue
 
 
+@router.callback_query(F.data == "cinema:about")
+async def cb_cinema_about(cb: CallbackQuery) -> None:
+    lang = user_lang(cb)
+    about_text = t(lang, "cinema.about_text")
+    # Send text first
+    await cb.message.answer(about_text)
+    # Then photos (if any)
+    try:
+        items = container.about_repository().list_cinema_photos()
+    except Exception:
+        items = []
+    media = []
+    for fn in items[:10]:
+        p = Path(DATA_DIR) / fn
+        if p.exists():
+            try:
+                media.append(InputMediaPhoto(media=FSInputFile(str(p))))
+            except Exception:
+                continue
+    if media:
+        try:
+            await cb.message.answer_media_group(media)
+        except Exception:
+            for m in media:
+                try:
+                    await cb.message.answer_photo(m.media)  # type: ignore[arg-type]
+                except Exception:
+                    continue
+    await cb.answer()
+
+
+@router.callback_query(F.data == "cinema:schedule")
+async def cb_cinema_schedule(cb: CallbackQuery) -> None:
+    lang = user_lang(cb)
+    poster = await container.event_repository().get_upcoming()
+    if not poster:
+        await cb.message.answer(t(lang, "cinema.poster"))
+        await cb.answer()
+        return
+    for item in poster:
+        try:
+            when_str = item.when.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            when_str = str(getattr(item, 'when', ''))
+        price = getattr(item, 'price', None)
+        price_str = f"{price}€" if price is not None else t(lang, "free") if callable(t) else "Free"
+        text = f"<b>{getattr(item, 'title', '')}</b>\n{when_str}\n{getattr(item, 'place', '')}\nЦена: {price_str}"
+        desc = getattr(item, 'description', None)
+        if desc:
+            try:
+                d = str(desc).strip()
+            except Exception:
+                d = None
+            if d:
+                text = f"{text}\n\n{d}"
+        if len(text) > 1024:
+            text = text[:1021] + "..."
+        kbd = ik_kbd([[ ("📝 " + t(lang, "cinema.register"), f"reg:{getattr(item, 'id', '')}") ]])
+        photo_name = getattr(item, 'photo', None)
+        if photo_name:
+            photo_path = Path(DATA_DIR) / str(photo_name)
+            if photo_path.exists():
+                try:
+                    await cb.message.answer_photo(photo=FSInputFile(str(photo_path)), caption=text, reply_markup=kbd)
+                    continue
+                except Exception:
+                    pass
+        await cb.message.answer(text, reply_markup=kbd)
+    await cb.answer()
+
+
 @router.callback_query(F.data.startswith("reg:"))
 async def register_film(cb: CallbackQuery) -> None:
     lang = user_lang(cb)

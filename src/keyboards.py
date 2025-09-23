@@ -31,14 +31,14 @@ def main_menu(lang: str) -> ReplyKeyboardMarkup:
     )
 
 
-def cinema_menu(lang: str) -> ReplyKeyboardMarkup:
-    # Film club submenu with About and Schedule
+def cinema_menu(lang: str):
+    from .bot.utils import ik_kbd
+    # Film club submenu (inline) with About and Schedule — same style as "Что посмотреть?"
     is_ru = (lang or "ru").startswith("ru")
     about = "ℹ️ О киноклубе" if is_ru else "ℹ️ About the Film Club"
     schedule = "🗓️ Расписание" if is_ru else "🗓️ Schedule"
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=about), KeyboardButton(text=schedule)],
-        ],
-        resize_keyboard=True,
-    )
+    # Show as inline buttons in the message (one per row) to match quiz appearance
+    return ik_kbd([
+        [(about, "cinema:about")],
+        [(schedule, "cinema:schedule")],
+    ])
