@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from aiogram import Router, F
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, CallbackQuery, FSInputFile, InputMediaPhoto
 
 from ..utils import user_lang, ik_kbd
@@ -14,11 +16,15 @@ from ...keyboards import cinema_menu
 router = Router()
 
 
+class CinemaStates(StatesGroup):
+    menu = State()
+
 # Main Film club button -> show submenu
 @router.message(F.text.in_({"Киноклуб", "Film club", "🎬 Киноклуб", "🎬 Film club"}))
-async def film_club_menu(message: Message) -> None:
+async def film_club_menu(message: Message, state: FSMContext) -> None:
     lang = user_lang(message)
     title = ("🎬 " + t(lang, "menu.cinema")) if (lang or "ru").startswith("ru") else ("🎬 " + t(lang, "menu.cinema"))
+    await state.set_state(CinemaStates.menu)
     await message.answer(title, reply_markup=cinema_menu(lang))
 
 

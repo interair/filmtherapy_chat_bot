@@ -32,7 +32,9 @@ logger = logging.getLogger(__name__)
 
 
 def build_dispatcher() -> Dispatcher:
-    dp = Dispatcher()
+    # Ensure FSM storage is explicitly set for reliability
+    from aiogram.fsm.storage.memory import MemoryStorage
+    dp = Dispatcher(storage=MemoryStorage())
     # include routers
     dp.include_router(start_router.router)
     dp.include_router(booking.router)
