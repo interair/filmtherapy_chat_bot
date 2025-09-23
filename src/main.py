@@ -15,18 +15,11 @@ from .bot.webapp import start_web, mark_bot_running
 from .config import settings
 from .profiling import step, since_interpreter_start, PROFILE_STARTUP
 
-# Ensure runtime directories exist before configuring logging
-ROOT_DIR = Path(__file__).resolve().parents[1]
-LOGS_DIR = ROOT_DIR / "logs"
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-
+# Configure logging to stdout only (cloud-native friendly)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler(filename=str(LOGS_DIR / "bot.log"), encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
+    handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
 
