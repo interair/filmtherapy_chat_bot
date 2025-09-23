@@ -49,6 +49,7 @@ RU = {
     "cinema.registered": "Вы зарегистрированы на встречу! Напомним заранее.",
     "cinema.canceled": "Вы отменили регистрацию на встречу киноклуба.",
     "cinema.already_registered": "Вы уже зарегистрированы на эту встречу.",
+    "cinema.about_text": "Наш киноклуб — это уютное пространство для всех, кто любит кино. Мы вместе смотрим и обсуждаем фильмы, делимся впечатлениями и просто хорошо проводим время. Присоединяйтесь!",
 
     "quiz.start": "Небольшой опрос: выберите настроение",
     "quiz.mood": "Выберите настроение:",
@@ -114,6 +115,7 @@ EN = {
     "cinema.registered": "You are registered! We'll remind you.",
     "cinema.canceled": "Your registration was canceled.",
     "cinema.already_registered": "You are already registered for this event.",
+    "cinema.about_text": "Our film club is a cozy space for everyone who loves cinema. We watch and discuss films together, share impressions, and just have a good time. Join us!",
 
     "quiz.start": "Mini quiz: choose your mood",
     "quiz.mood": "Pick your mood:",

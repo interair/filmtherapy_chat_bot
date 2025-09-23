@@ -421,6 +421,42 @@ class AboutRepository:
         # Store only the filename in Firestore
         self._doc.set({"photo": filename}, merge=True)
 
+    # --- Film club (cinema) About photos management ---
+    def list_cinema_photos(self) -> list[str]:
+        """Return list of saved cinema (film club) photo filenames that exist on disk."""
+        snap = self._doc.get()
+        data = snap.to_dict() or {}
+        items = data.get("cinema_photos")
+        if not isinstance(items, list):
+            return []
+        out: list[str] = []
+        for it in items:
+            if not isinstance(it, str) or not it:
+                continue
+            path = os.path.join(DATA_DIR, it)
+            if os.path.exists(path):
+                out.append(it)
+        return out
+
+    async def add_cinema_photo(self, filename: str) -> None:
+        snap = self._doc.get()
+        data = snap.to_dict() or {}
+        items = data.get("cinema_photos")
+        if not isinstance(items, list):
+            items = []
+        if filename not in items:
+            items.append(filename)
+        self._doc.set({"cinema_photos": items}, merge=True)
+
+    async def delete_cinema_photo(self, filename: str) -> None:
+        snap = self._doc.get()
+        data = snap.to_dict() or {}
+        items = data.get("cinema_photos")
+        if not isinstance(items, list):
+            items = []
+        items = [x for x in items if x != filename]
+        self._doc.set({"cinema_photos": items}, merge=True)
+
 
 class ScheduleRepository:
     def __init__(self) -> None:

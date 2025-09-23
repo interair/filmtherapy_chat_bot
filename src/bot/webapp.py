@@ -603,10 +603,18 @@ async def web_about(
     _: None = Depends(verify_web_auth),
 ):
     saved = request.query_params.get("saved") == "1"
+    deleted = request.query_params.get("deleted") == "1"
     cfg = await about_repo.get()
     fn = cfg.get("photo") if isinstance(cfg, dict) else None
     photo = fn if isinstance(fn, str) and fn else ""
-    return templates.TemplateResponse("about.html", {"request": request, "saved": saved, "photo": photo})
+    cinema_photos = about_repo.list_cinema_photos()
+    return templates.TemplateResponse("about.html", {
+        "request": request,
+        "saved": saved,
+        "deleted": deleted,
+        "photo": photo,
+        "cinema_photos": cinema_photos,
+    })
 
 
 @app.post("/about/save")
@@ -643,6 +651,72 @@ async def web_about_save(
     except Exception as e:
         logger.exception("Web: about/save failed")
         return PlainTextResponse(content=f"Upload failed: {html_escape(str(e))}", status_code=500)
+
+
+@app.post("/about/cinema/add")
+async def web_about_cinema_add(
+    request: Request,
+    about_repo: AboutRepository = Depends(get_about_repository),
+    _: None = Depends(verify_web_auth),
+):
+    data = await request.form()
+    # Receive multiple files from input name="photos"
+    files = []
+    try:
+        files = data.getlist("photos")  # type: ignore[attr-defined]
+    except Exception:
+        f = data.get("photos")
+        files = [f] if f else []
+    saved_any = False
+    for idx, file_field in enumerate(files):
+        if not file_field or not getattr(file_field, 'filename', ''):
+            continue
+        try:
+            name = getattr(file_field, 'filename', '')
+            content = await file_field.read() if hasattr(file_field, 'read') else bytes(file_field)  # type: ignore
+            if not isinstance(content, (bytes, bytearray)) or len(content) == 0:
+                continue
+            if len(content) > 10 * 1024 * 1024:
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            if ext not in (".jpg", ".jpeg", ".png", ".webp"):
+                ext = ".jpg"
+            ts = datetime.now().strftime('%Y%m%d-%H%M%S')
+            safe_name = f"cinema_{ts}_{idx}{ext}"
+            dst = ROOT_DIR / "data" / safe_name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            with open(dst, "wb") as out:
+                out.write(content)
+            await about_repo.add_cinema_photo(safe_name)
+            logger.info("Web: about/cinema/add file=%s bytes=%d", safe_name, len(content))
+            saved_any = True
+        except Exception:
+            logger.exception("Web: about/cinema/add failed for a file")
+            continue
+    return RedirectResponse(url=f"/about?{'saved=1' if saved_any else ''}", status_code=302)
+
+
+@app.get("/about/cinema/delete/{name}")
+async def web_about_cinema_delete(
+    name: str,
+    about_repo: AboutRepository = Depends(get_about_repository),
+    _: None = Depends(verify_web_auth),
+):
+    # Basic sanitization: only allow filenames we know in repository
+    items = set(about_repo.list_cinema_photos())
+    if name in items:
+        try:
+            await about_repo.delete_cinema_photo(name)
+        except Exception:
+            logger.debug("Failed to update repo when deleting cinema photo: %s", name, exc_info=True)
+        try:
+            p = ROOT_DIR / "data" / name
+            if p.exists():
+                p.unlink()
+            logger.info("Web: about/cinema/delete name=%s", name)
+        except Exception:
+            logger.debug("Failed to delete file for cinema photo: %s", name, exc_info=True)
+    return RedirectResponse(url="/about?deleted=1", status_code=302)
 
 
 # Locations management

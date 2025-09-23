@@ -29,3 +29,16 @@ def main_menu(lang: str) -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
     )
+
+
+def cinema_menu(lang: str) -> ReplyKeyboardMarkup:
+    # Film club submenu with About and Schedule
+    is_ru = (lang or "ru").startswith("ru")
+    about = "ℹ️ О киноклубе" if is_ru else "ℹ️ About the Film Club"
+    schedule = "🗓️ Расписание" if is_ru else "🗓️ Schedule"
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=about), KeyboardButton(text=schedule)],
+        ],
+        resize_keyboard=True,
+    )

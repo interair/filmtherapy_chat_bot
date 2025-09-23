@@ -3,18 +3,28 @@ from __future__ import annotations
 from pathlib import Path
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, FSInputFile
+from aiogram.types import Message, CallbackQuery, FSInputFile, InputMediaPhoto
 
 from ..utils import user_lang, ik_kbd
 from ...container import container
 from ...i18n.texts import t
 from ...services.storage import DATA_DIR
+from ...keyboards import cinema_menu
 
 router = Router()
 
 
+# Main Film club button -> show submenu
 @router.message(F.text.in_({"Киноклуб", "Film club", "🎬 Киноклуб", "🎬 Film club"}))
-async def film_club(message: Message) -> None:
+async def film_club_menu(message: Message) -> None:
+    lang = user_lang(message)
+    title = ("🎬 " + t(lang, "menu.cinema")) if (lang or "ru").startswith("ru") else ("🎬 " + t(lang, "menu.cinema"))
+    await message.answer(title, reply_markup=cinema_menu(lang))
+
+
+# Schedule button -> previous behavior
+@router.message(F.text.in_({"Расписание", "🗓️ Расписание", "Schedule", "🗓️ Schedule"}))
+async def film_club_schedule(message: Message) -> None:
     lang = user_lang(message)
     poster = await container.event_repository().get_upcoming()
     if not poster:
@@ -55,6 +65,39 @@ async def film_club(message: Message) -> None:
                 except Exception:
                     pass
         await message.answer(text, reply_markup=kbd)
+
+
+# About Film club -> send text + media group
+@router.message(F.text.in_({"О киноклубе", "ℹ️ О киноклубе", "About the Film Club", "ℹ️ About the Film Club"}))
+async def film_club_about(message: Message) -> None:
+    lang = user_lang(message)
+    # First send the about text (editable via /i18n)
+    about_text = t(lang, "cinema.about_text")
+    await message.answer(about_text)
+
+    # Then send photo group (0..many)
+    try:
+        items = container.about_repository().list_cinema_photos()
+    except Exception:
+        items = []
+    media = []
+    for fn in items[:10]:  # Telegram limit per media group
+        p = Path(DATA_DIR) / fn
+        if p.exists():
+            try:
+                media.append(InputMediaPhoto(media=FSInputFile(str(p))))
+            except Exception:
+                continue
+    if media:
+        try:
+            await message.answer_media_group(media)
+        except Exception:
+            # Fallback: send sequentially if media group fails
+            for m in media:
+                try:
+                    await message.answer_photo(m.media)  # type: ignore[arg-type]
+                except Exception:
+                    continue
 
 
 @router.callback_query(F.data.startswith("reg:"))

@@ -4,7 +4,11 @@
   <h1>👤 Edit About</h1>
   <a href="/" class="button">← Back</a>
   {% if saved %}<div class="alert">✓ Saved</div>{% endif %}
+  {% if deleted %}<div class="alert">✓ Deleted</div>{% endif %}
+
   <div class="card">
+    <h2>About Me</h2>
+    <p><small>The main text is edited in the Translations page (key: about.text). Here you can set a single photo shown in the bot.</small></p>
     <h3>Photo</h3>
     <form method="post" action="/about/save" enctype="multipart/form-data">
       <p><input type="file" name="photo" accept="image/*" required></p>
@@ -16,5 +20,28 @@
       </div>
     {% endif %}
     <p><small>Accepted: JPG, PNG, WEBP. The image will be shown in the bot in the About section.</small></p>
+  </div>
+
+  <div class="card">
+    <h2>About Film Club</h2>
+    <p><small>The text is edited in the Translations page (key: cinema.about_text). Below you can upload multiple images that will be sent in the bot after the text.</small></p>
+    <h3>Upload images</h3>
+    <form method="post" action="/about/cinema/add" enctype="multipart/form-data">
+      <p><input type="file" name="photos" accept="image/*" multiple></p>
+      <p><button type="submit" class="button success">💾 Upload</button></p>
+    </form>
+    {% if cinema_photos and cinema_photos|length > 0 %}
+      <h3>Current images</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        {% for fn in cinema_photos %}
+          <div style="border:1px solid #ddd;border-radius:8px;padding:6px;text-align:center">
+            <img src="/static/{{ fn }}" alt="cinema photo" style="max-width:200px;max-height:150px;display:block;margin:auto">
+            <div style="margin-top:6px"><a class="button danger" href="/about/cinema/delete/{{ fn }}">🗑️ Delete</a></div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p><em>No images uploaded yet.</em></p>
+    {% endif %}
   </div>
 {% endblock %}

@@ -13,9 +13,6 @@ from ...keyboards import main_menu
 
 router = Router()
 
-
-
-
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     uid = message.from_user.id if message and message.from_user else None
