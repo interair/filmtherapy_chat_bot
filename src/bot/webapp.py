@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -53,6 +54,7 @@ templates = Jinja2Templates(directory=str(ROOT_DIR / "templates"))
 _TG_BOT: Optional[Bot] = None
 _TG_DP: Optional[Dispatcher] = None
 _WEBHOOK_PATH = "/tg/webhook"
+_WEBHOOK_HEADER = "X-Telegram-Bot-Api-Secret-Token"
 
 # Bot runtime indicator (updated from main.py)
 _BOT_RUNNING = False
@@ -80,6 +82,15 @@ async def telegram_webhook(request: Request):
         ip = getattr(client, "host", None) if client else None
         logger.warning("Webhook called while disabled (ip=%s)", ip)
         return PlainTextResponse("webhook disabled", status_code=503)
+
+    # Verify Telegram secret token header if configured
+    secret = getattr(settings, "telegram_webhook_secret", None)
+    if secret:
+        received = request.headers.get(_WEBHOOK_HEADER)
+        if not (isinstance(received, str) and secrets.compare_digest(received, secret)):
+            logger.warning("Webhook: secret token check failed (ip=%s)", getattr(getattr(request, "client", None), "host", None))
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         body = await request.body()
         logger.info("Webhook: received update bytes=%d", len(body) if body is not None else 0)
@@ -96,8 +107,12 @@ async def telegram_webhook(request: Request):
 async def _on_startup():
     if _TG_BOT and settings.use_webhook and settings.base_url:
         url = settings.base_url.rstrip("/") + _WEBHOOK_PATH
-        await _TG_BOT.set_webhook(url=url)
-        logger.info("Webhook set: %s", url)
+        secret = getattr(settings, "telegram_webhook_secret", None)
+        if secret:
+            await _TG_BOT.set_webhook(url=url, secret_token=secret)
+        else:
+            await _TG_BOT.set_webhook(url=url)
+        logger.info("Webhook set: %s (secret=%s)", url, "on" if secret else "off")
 
 
 @app.on_event("shutdown")

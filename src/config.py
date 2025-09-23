@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     telegram_token: str = Field(..., env="TELEGRAM_TOKEN")
     admins: str = Field(default="", env="ADMINS")  # Keep as string to avoid JSON parsing
     default_lang: str = Field(default="ru", env="DEFAULT_LANG")
+
+    # Telegram Webhook security
+    telegram_webhook_secret: str | None = Field(default=None, env="TELEGRAM_WEBHOOK_SECRET")
     
     # Web Interface
     web_username: str | None = Field(default=None, env="WEB_USERNAME")

@@ -31,4 +31,5 @@ This document summarizes the security posture of the project and required practi
 
 ## Application
 - Avoid logging sensitive data (tokens, credentials, PII). Logs are stored locally in logs/ for dev and should be rotated/limited in production.
+- Set TELEGRAM_WEBHOOK_SECRET and ensure your Cloud Run/Ingress forwards the header X-Telegram-Bot-Api-Secret-Token; the app validates this header on incoming webhook requests.
 - Keep dependencies up to date (requirements.txt). Use dependabot or scheduled reviews.
