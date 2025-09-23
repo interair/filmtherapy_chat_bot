@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 
-from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi import FastAPI, Request, Depends, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
@@ -290,6 +290,25 @@ class BookingView(pydantic.BaseModel):
     @classmethod
     def list_from_raw(cls, items: list[dict] | None) -> list["BookingView"]:
         return [cls.from_raw(b or {}) for b in (items or [])]
+
+
+class LocationCreate(pydantic.BaseModel):
+    name: str
+
+    @pydantic.field_validator("name")
+    @classmethod
+    def _strip_and_require(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("name must be non-empty")
+        return v
+
+
+def location_form(name: str = Form(...)) -> "LocationCreate":
+    try:
+        return LocationCreate(name=name)
+    except pydantic.ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors())
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -801,19 +820,17 @@ async def web_locations(
 
 @app.post("/locations/add")
 async def web_locations_add(
-    request: Request,
+    form: LocationCreate = Depends(location_form),
     loc_repo: LocationRepository = Depends(get_location_service),
     _: None = Depends(verify_web_auth),
 ):
-    data = await request.form()
-    name = str(data.get("name", "")).strip()
-    if name:
-        logger.info("Web: locations/add name=%s", name)
-        from ..services.models import Location
-        try:
-            await loc_repo.create(Location(name=name))
-        except ValueError:
-            logger.debug("Failed to create location (invalid value): %r", name, exc_info=True)
+    name = form.name
+    logger.info("Web: locations/add name=%s", name)
+    from ..services.models import Location
+    try:
+        await loc_repo.create(Location(name=name))
+    except ValueError:
+        logger.debug("Failed to create location (invalid value): %r", name, exc_info=True)
     return RedirectResponse(url="/locations?saved=1", status_code=302)
 
 
