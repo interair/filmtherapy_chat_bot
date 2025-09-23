@@ -96,9 +96,6 @@ resource "google_storage_bucket" "data" {
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
 
-  versioning {
-    enabled = true
-  }
 
   lifecycle_rule {
     action {
@@ -256,8 +253,8 @@ resource "google_cloud_run_v2_service" "app" {
 
       resources {
         limits = {
-          memory = "2Gi"
-          cpu    = "4"    # For fast start
+          memory = "1Gi"
+          cpu    = "2"    # For fast start
         }
         cpu_idle = true     # Allow CPU to idle when not processing
         startup_cpu_boost = true  # Faster cold starts by boosting CPU during startup
