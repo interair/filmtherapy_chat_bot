@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: build-deploy-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   # Repository variables (Settings → Secrets and variables → Actions → Variables)
@@ -27,10 +27,16 @@ jobs:
   build-and-deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
 
       - name: Resolve configuration
         id: cfg
@@ -99,29 +105,33 @@ jobs:
           ADMINS: ${{ vars.ADMINS }}
           BASE_URL: ${{ vars.BASE_URL }}
           USE_WEBHOOK: ${{ vars.USE_WEBHOOK }}
-          # Optional overrides for Secret Manager secret IDs (defaults equal to env var names)
-          SECRET_TELEGRAM_TOKEN: ${{ vars.SECRET_TELEGRAM_TOKEN || 'TELEGRAM_TOKEN' }}
-          TELEGRAM_WEBHOOK_SECRET: ${{ vars.TELEGRAM_WEBHOOK_SECRET || 'TELEGRAM_WEBHOOK_SECRET' }}
-          SECRET_WEB_USERNAME: ${{ vars.SECRET_WEB_USERNAME || 'WEB_USERNAME' }}
-          SECRET_WEB_PASSWORD: ${{ vars.SECRET_WEB_PASSWORD || 'WEB_PASSWORD' }}
+          # Required Secret Manager secret IDs (must exist)
+          SECRET_TELEGRAM_TOKEN: ${{ vars.SECRET_TELEGRAM_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ vars.TELEGRAM_WEBHOOK_SECRET }}
+          SECRET_WEB_USERNAME: ${{ vars.SECRET_WEB_USERNAME }}
+          SECRET_WEB_PASSWORD: ${{ vars.SECRET_WEB_PASSWORD }}
         run: |
           set -euo pipefail
           PROJECT="${{ steps.cfg.outputs.project }}"
           REGION="${{ steps.cfg.outputs.region }}"
           SERVICE="${{ steps.cfg.outputs.service }}"
 
-          # Pass only non-sensitive vars via env file
+          # Validate required non-sensitive repository variables
+          if [ -z "${ADMINS:-}" ]; then echo "::error::ADMINS is required (vars)"; exit 1; fi
+          if [ -z "${USE_WEBHOOK:-}" ]; then echo "::error::USE_WEBHOOK is required (vars)"; exit 1; fi
+          if [ -z "${BASE_URL:-}" ]; then echo "::error::BASE_URL is required (vars)"; exit 1; fi
+
+          # Validate required Secret Manager secret IDs
+          if [ -z "${SECRET_TELEGRAM_TOKEN:-}" ]; then echo "::error::SECRET_TELEGRAM_TOKEN is required (vars)"; exit 1; fi
+          if [ -z "${SECRET_WEB_USERNAME:-}" ]; then echo "::error::SECRET_WEB_USERNAME is required (vars)"; exit 1; fi
+          if [ -z "${SECRET_WEB_PASSWORD:-}" ]; then echo "::error::SECRET_WEB_PASSWORD is required (vars)"; exit 1; fi
+
+          # Prepare env file with required non-sensitive vars
           ENV_FILE="$(mktemp)"
           : > "${ENV_FILE}"
-          if [ -n "${ADMINS:-}" ]; then
-            echo "ADMINS: \"${ADMINS}\"" >> "${ENV_FILE}"
-          fi
-          if [ -n "${USE_WEBHOOK:-}" ]; then
-            echo "USE_WEBHOOK: \"${USE_WEBHOOK}\"" >> "${ENV_FILE}"
-          fi
-          if [ -n "${BASE_URL:-}" ]; then
-            echo "BASE_URL: \"${BASE_URL}\"" >> "${ENV_FILE}"
-          fi
+          echo "ADMINS: \"${ADMINS}\"" >> "${ENV_FILE}"
+          echo "USE_WEBHOOK: \"${USE_WEBHOOK}\"" >> "${ENV_FILE}"
+          echo "BASE_URL: \"${BASE_URL}\"" >> "${ENV_FILE}"
 
           # Always pass build metadata
           echo "GIT_COMMIT: \"${GITHUB_SHA}\"" >> "${ENV_FILE}"
@@ -142,18 +152,25 @@ jobs:
 
       - name: Set Telegram webhook
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           BASE_URL: ${{ vars.BASE_URL }}
+          SECRET_TELEGRAM_TOKEN: ${{ vars.SECRET_TELEGRAM_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ vars.TELEGRAM_WEBHOOK_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${TELEGRAM_TOKEN:-}" ] || [ -z "${BASE_URL:-}" ]; then
-            echo "Skipping: TELEGRAM_TOKEN or BASE_URL not set"
-            exit 0
-          fi
+          # Validate required inputs
+          if [ -z "${BASE_URL:-}" ]; then echo "::error::BASE_URL is required (vars)"; exit 1; fi
+          if [ -z "${SECRET_TELEGRAM_TOKEN:-}" ]; then echo "::error::SECRET_TELEGRAM_TOKEN is required (vars)"; exit 1; fi
+          if [ -z "${TELEGRAM_WEBHOOK_SECRET:-}" ]; then echo "::error::TELEGRAM_WEBHOOK_SECRET is required (vars)"; exit 1; fi
+
+          # Mask secrets in logs
+          if [ -n "${SECRET_TELEGRAM_TOKEN:-}" ]; then echo "::add-mask::${SECRET_TELEGRAM_TOKEN}"; fi
+          if [ -n "${WEBHOOK_SECRET_VALUE:-}" ]; then echo "::add-mask::${WEBHOOK_SECRET_VALUE}"; fi
+
           URL="${BASE_URL%/}/tg/webhook"
           echo "Setting webhook to ${URL}"
           RESPONSE="$(curl -sS -X POST \
-            "https://api.telegram.org/bot${TELEGRAM_TOKEN}/setWebhook" \
-            -d "url=${URL}")"
-          echo "${RESPONSE}"
+            "https://api.telegram.org/bot${SECRET_TELEGRAM_TOKEN}/setWebhook" \
+            --data-urlencode "url=${URL}" \
+            --data-urlencode "secret_token=${WEBHOOK_SECRET_VALUE}")"
           echo "${RESPONSE}" | grep -q '"ok":true' || { echo "::error::Failed to set Telegram webhook"; exit 1; }
+          echo "Webhook set successfully"
