@@ -28,6 +28,27 @@ resource "google_project_service" "secretmanager" {
   service = "secretmanager.googleapis.com"
 }
 
+# Reference existing Secret Manager secrets (pre-created)
+data "google_secret_manager_secret" "telegram_token" {
+  project   = var.project_id
+  secret_id = var.telegram_token_secret_id
+}
+
+data "google_secret_manager_secret" "telegram_webhook_secret" {
+  project   = var.project_id
+  secret_id = var.telegram_webhook_secret_id
+}
+
+data "google_secret_manager_secret" "web_username" {
+  project   = var.project_id
+  secret_id = var.web_username_secret_id
+}
+
+data "google_secret_manager_secret" "web_password" {
+  project   = var.project_id
+  secret_id = var.web_password_secret_id
+}
+
 # Docker repository for container images
 resource "google_artifact_registry_repository" "bot_images" {
   project       = var.project_id
@@ -172,7 +193,7 @@ resource "google_cloud_run_v2_service" "app" {
   template {
     service_account = google_service_account.runtime.email
     
-    max_instance_request_concurrency = 5
+    max_instance_request_concurrency = 10
 
     containers {
       image = var.app_image
@@ -187,6 +208,47 @@ resource "google_cloud_run_v2_service" "app" {
         value = "true"
       }
 
+      # Secrets wired as environment variables from Secret Manager
+      env {
+        name = "TELEGRAM_TOKEN"
+        value_source {
+          secret_key_ref {
+            secret  = data.google_secret_manager_secret.telegram_token.name
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "TELEGRAM_WEBHOOK_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = data.google_secret_manager_secret.telegram_webhook_secret.name
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "WEB_USERNAME"
+        value_source {
+          secret_key_ref {
+            secret  = data.google_secret_manager_secret.web_username.name
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "WEB_PASSWORD"
+        value_source {
+          secret_key_ref {
+            secret  = data.google_secret_manager_secret.web_password.name
+            version = "latest"
+          }
+        }
+      }
+
       volume_mounts {
         name       = "data-vol"
         mount_path = "/app/src/data"
@@ -194,8 +256,8 @@ resource "google_cloud_run_v2_service" "app" {
 
       resources {
         limits = {
-          memory = "512Mi"
-          cpu    = "1"    # Now allowed with concurrency = 1
+          memory = "2Gi"
+          cpu    = "4"    # For fast start
         }
         cpu_idle = true     # Allow CPU to idle when not processing
         startup_cpu_boost = true  # Faster cold starts by boosting CPU during startup
@@ -225,9 +287,7 @@ resource "google_cloud_run_v2_service" "app" {
       max_instance_count = 1
       min_instance_count = 0  # Scale to zero when not needed
     }
-    # Reduce timeout for faster scale-down
-    timeout = "3600s"
-    
+
     execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
   }
   traffic {

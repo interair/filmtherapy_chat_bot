@@ -83,13 +83,15 @@ async def telegram_webhook(request: Request):
         logger.warning("Webhook called while disabled (ip=%s)", ip)
         return PlainTextResponse("webhook disabled", status_code=503)
 
-    # Verify Telegram secret token header if configured
-    secret = getattr(settings, "telegram_webhook_secret", None)
-    if secret:
-        received = request.headers.get(_WEBHOOK_HEADER)
-        if not (isinstance(received, str) and secrets.compare_digest(received, secret)):
-            logger.warning("Webhook: secret token check failed (ip=%s)", getattr(getattr(request, "client", None), "host", None))
-            raise HTTPException(status_code=401, detail="Unauthorized")
+    # Verify Telegram secret token header (required in webhook mode)
+    secret = settings.telegram_webhook_secret
+    if not (isinstance(secret, str) and secret.strip()):
+        logger.error("Webhook: secret is not configured while webhook is enabled")
+        raise HTTPException(status_code=503, detail="Webhook misconfigured")
+    received = request.headers.get(_WEBHOOK_HEADER)
+    if not (isinstance(received, str) and secrets.compare_digest(received, secret)):
+        logger.warning("Webhook: secret token check failed (ip=%s)", getattr(getattr(request, "client", None), "host", None))
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
         body = await request.body()
@@ -107,12 +109,12 @@ async def telegram_webhook(request: Request):
 async def _on_startup():
     if _TG_BOT and settings.use_webhook and settings.base_url:
         url = settings.base_url.rstrip("/") + _WEBHOOK_PATH
-        secret = getattr(settings, "telegram_webhook_secret", None)
-        if secret:
-            await _TG_BOT.set_webhook(url=url, secret_token=secret)
-        else:
-            await _TG_BOT.set_webhook(url=url)
-        logger.info("Webhook set: %s (secret=%s)", url, "on" if secret else "off")
+        secret = settings.telegram_webhook_secret
+        if not (isinstance(secret, str) and secret.strip()):
+            # Should be prevented by settings validation, but double-check to be safe
+            raise RuntimeError("TELEGRAM_WEBHOOK_SECRET is required when USE_WEBHOOK=true")
+        await _TG_BOT.set_webhook(url=url, secret_token=secret)
+        logger.info("Webhook set: %s (secret=on)", url)
 
 
 @app.on_event("shutdown")

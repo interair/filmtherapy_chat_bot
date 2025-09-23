@@ -105,11 +105,6 @@ jobs:
           ADMINS: ${{ vars.ADMINS }}
           BASE_URL: ${{ vars.BASE_URL }}
           USE_WEBHOOK: ${{ vars.USE_WEBHOOK }}
-          # Required Secret Manager secret IDs (must exist)
-          SECRET_TELEGRAM_TOKEN: ${{ vars.SECRET_TELEGRAM_TOKEN }}
-          TELEGRAM_WEBHOOK_SECRET: ${{ vars.TELEGRAM_WEBHOOK_SECRET }}
-          SECRET_WEB_USERNAME: ${{ vars.SECRET_WEB_USERNAME }}
-          SECRET_WEB_PASSWORD: ${{ vars.SECRET_WEB_PASSWORD }}
         run: |
           set -euo pipefail
           PROJECT="${{ steps.cfg.outputs.project }}"
@@ -121,11 +116,6 @@ jobs:
           if [ -z "${USE_WEBHOOK:-}" ]; then echo "::error::USE_WEBHOOK is required (vars)"; exit 1; fi
           if [ -z "${BASE_URL:-}" ]; then echo "::error::BASE_URL is required (vars)"; exit 1; fi
 
-          # Validate required Secret Manager secret IDs
-          if [ -z "${SECRET_TELEGRAM_TOKEN:-}" ]; then echo "::error::SECRET_TELEGRAM_TOKEN is required (vars)"; exit 1; fi
-          if [ -z "${SECRET_WEB_USERNAME:-}" ]; then echo "::error::SECRET_WEB_USERNAME is required (vars)"; exit 1; fi
-          if [ -z "${SECRET_WEB_PASSWORD:-}" ]; then echo "::error::SECRET_WEB_PASSWORD is required (vars)"; exit 1; fi
-
           # Prepare env file with required non-sensitive vars
           ENV_FILE="$(mktemp)"
           : > "${ENV_FILE}"
@@ -136,41 +126,13 @@ jobs:
           # Always pass build metadata
           echo "GIT_COMMIT: \"${GITHUB_SHA}\"" >> "${ENV_FILE}"
 
-          # Deploy with Secret Manager references for sensitive values
+          # Deploy image and non-secret envs; secrets are managed by Terraform on the service
           gcloud run deploy "${SERVICE}" \
             --project "${PROJECT}" \
             --region "${REGION}" \
             --platform managed \
             --image "${IMAGE_URI}" \
-            --env-vars-file="${ENV_FILE}" \
-            --set-secrets "TELEGRAM_TOKEN=${SECRET_TELEGRAM_TOKEN}:latest" \
-            --set-secrets "WEB_USERNAME=${SECRET_WEB_USERNAME}:latest" \
-            --set-secrets "WEB_PASSWORD=${SECRET_WEB_PASSWORD}:latest" \
-            --set-secrets "TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET}:latest"
+            --env-vars-file="${ENV_FILE}"
 
-          echo "Deployed ${SERVICE} in ${REGION} with image ${IMAGE_URI} (secrets via Secret Manager)"
+          echo "Deployed ${SERVICE} in ${REGION} with image ${IMAGE_URI} (secrets managed by Terraform)"
 
-      - name: Set Telegram webhook
-        env:
-          BASE_URL: ${{ vars.BASE_URL }}
-          SECRET_TELEGRAM_TOKEN: ${{ vars.SECRET_TELEGRAM_TOKEN }}
-          TELEGRAM_WEBHOOK_SECRET: ${{ vars.TELEGRAM_WEBHOOK_SECRET }}
-        run: |
-          set -euo pipefail
-          # Validate required inputs
-          if [ -z "${BASE_URL:-}" ]; then echo "::error::BASE_URL is required (vars)"; exit 1; fi
-          if [ -z "${SECRET_TELEGRAM_TOKEN:-}" ]; then echo "::error::SECRET_TELEGRAM_TOKEN is required (vars)"; exit 1; fi
-          if [ -z "${TELEGRAM_WEBHOOK_SECRET:-}" ]; then echo "::error::TELEGRAM_WEBHOOK_SECRET is required (vars)"; exit 1; fi
-
-          # Mask secrets in logs
-          if [ -n "${SECRET_TELEGRAM_TOKEN:-}" ]; then echo "::add-mask::${SECRET_TELEGRAM_TOKEN}"; fi
-          if [ -n "${WEBHOOK_SECRET_VALUE:-}" ]; then echo "::add-mask::${WEBHOOK_SECRET_VALUE}"; fi
-
-          URL="${BASE_URL%/}/tg/webhook"
-          echo "Setting webhook to ${URL}"
-          RESPONSE="$(curl -sS -X POST \
-            "https://api.telegram.org/bot${SECRET_TELEGRAM_TOKEN}/setWebhook" \
-            --data-urlencode "url=${URL}" \
-            --data-urlencode "secret_token=${WEBHOOK_SECRET_VALUE}")"
-          echo "${RESPONSE}" | grep -q '"ok":true' || { echo "::error::Failed to set Telegram webhook"; exit 1; }
-          echo "Webhook set successfully"

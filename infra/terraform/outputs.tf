@@ -32,5 +32,16 @@ output "wif" {
   description = "Workload Identity Federation resource names"
 }
 
+# Secret names managed by Terraform (for reference)
+output "secrets" {
+  value = {
+    TELEGRAM_TOKEN          = data.google_secret_manager_secret.telegram_token.name
+    TELEGRAM_WEBHOOK_SECRET = data.google_secret_manager_secret.telegram_webhook_secret.name
+    WEB_USERNAME            = data.google_secret_manager_secret.web_username.name
+    WEB_PASSWORD            = data.google_secret_manager_secret.web_password.name
+  }
+  description = "Secret Manager secret resource names"
+}
+
 
 

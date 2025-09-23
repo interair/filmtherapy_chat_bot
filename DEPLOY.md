@@ -1,6 +1,6 @@
 # Deploy to Google Cloud Run (short guide)
 
-We deploy from GitHub Actions using .github/workflows/cloud-run-deploy.yml. It builds the image and pushes to Google Artifact Registry, then deploys to Cloud Run and sets the Telegram webhook (if BASE_URL and TELEGRAM_TOKEN are set).
+We deploy from GitHub Actions using .github/workflows/cloud-run-deploy.yml. It builds the image, pushes to Google Artifact Registry, and deploys to Cloud Run. The application configures the Telegram webhook on startup.
 
 ## Requirements
 - GCP project. Required APIs (Cloud Run, Artifact Registry, IAM Credentials, Cloud Storage, Secret Manager) are enabled automatically by Terraform in infra/terraform.
@@ -17,22 +17,17 @@ Variables
 - WORKLOAD_IDENTITY_PROVIDER (WIF provider resource name)
 - SERVICE_ACCOUNT_EMAIL (SA used with WIF)
 - AR_REPOSITORY (Artifact Registry repo, default bot-images)
-- Optional app config used at deploy: ADMINS, BASE_URL, USE_WEBHOOK
+- App config used at deploy (non‑secret): ADMINS, BASE_URL, USE_WEBHOOK
 
 Secrets
 - GCP_SA_KEY (only if not using WIF)
-- TELEGRAM_TOKEN, WEB_USERNAME, WEB_PASSWORD (optional; used by the workflow only for setting the Telegram webhook post-deploy). Runtime secrets are sourced from Secret Manager.
-
-Optional variables (to override Secret Manager secret IDs)
-- SECRET_TELEGRAM_TOKEN (default: TELEGRAM_TOKEN)
-- SECRET_WEB_USERNAME (default: WEB_USERNAME)
-- SECRET_WEB_PASSWORD (default: WEB_PASSWORD)
+- Application secrets (Telegram token, webhook secret, web credentials) are managed by Terraform in Google Secret Manager and are NOT used in CI.
 
 ## How it works
 - Auth via WIF if configured, otherwise via GCP_SA_KEY.
 - docker/build-push-action builds and pushes image to REGION-docker.pkg.dev/PROJECT/AR_REPOSITORY/owner/repo:ref
-- gcloud run deploy uses that image; passes non-sensitive env vars via an env file and wires TELEGRAM_TOKEN/WEB_USERNAME/WEB_PASSWORD from Secret Manager using --set-secrets.
-- After deploy, the workflow calls Telegram setWebhook if TELEGRAM_TOKEN and BASE_URL are present.
+- gcloud run deploy uses that image; passes only non‑secret env vars via an env file. Secrets are preconfigured on the Cloud Run service by Terraform.
+- The application sets the Telegram webhook on startup using BASE_URL and TELEGRAM_WEBHOOK_SECRET.
 
 ## First setup
 1) Create an Artifact Registry repo (e.g., bot-images) in your region.

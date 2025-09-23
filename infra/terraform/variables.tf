@@ -43,3 +43,28 @@ variable "enable_wif" {
   type        = bool
   default     = true
 }
+
+# Existing Secret Manager secret IDs (pre-created in Google)
+variable "telegram_token_secret_id" {
+  description = "Secret Manager secret ID for the Telegram bot token (e.g., TELEGRAM_TOKEN)"
+  type        = string
+  default     = "TELEGRAM_TOKEN"
+}
+
+variable "telegram_webhook_secret_id" {
+  description = "Secret Manager secret ID for the Telegram webhook secret (e.g., TELEGRAM_WEBHOOK_SECRET)"
+  type        = string
+  default     = "TELEGRAM_WEBHOOK_SECRET"
+}
+
+variable "web_username_secret_id" {
+  description = "Secret Manager secret ID for the web admin username (e.g., WEB_USERNAME)"
+  type        = string
+  default     = "WEB_USERNAME"
+}
+
+variable "web_password_secret_id" {
+  description = "Secret Manager secret ID for the web admin password (e.g., WEB_PASSWORD)"
+  type        = string
+  default     = "WEB_PASSWORD"
+}

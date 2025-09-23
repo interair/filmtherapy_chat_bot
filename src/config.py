@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +28,13 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
     )
+
+    @model_validator(mode="after")
+    def _require_webhook_secret_when_enabled(self):
+        """Ensure webhook secret is provided when webhook mode is enabled."""
+        if self.use_webhook and (not self.telegram_webhook_secret or not str(self.telegram_webhook_secret).strip()):
+            raise ValueError("TELEGRAM_WEBHOOK_SECRET is required when USE_WEBHOOK=true")
+        return self
     
     @property
     def admin_list(self) -> List[int]:

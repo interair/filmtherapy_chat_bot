@@ -10,9 +10,9 @@ This document summarizes the security posture of the project and required practi
 
 ## Secrets Management
 - Never commit real secrets. Local development may use a local .env file; production uses Google Secret Manager.
-- Cloud Run is deployed with Secret Manager references (gcloud run deploy --set-secrets ...), so values are not exposed in the UI.
+- Terraform references pre-created Secret Manager secrets and wires them to Cloud Run as secret-backed environment variables; CI/CD never handles secret values.
 - GitHub Actions must NOT use long‑lived GCP JSON keys. Authentication uses GitHub OIDC Workload Identity Federation (WIF) only.
-- The Telegram webhook step uses TELEGRAM_TOKEN from repository secrets. Keep it limited to that step only and rotate if leaked.
+- Telegram webhook is configured by the application at startup using the secret token; CI does not call Telegram APIs with secrets.
 
 ## Terraform State and IaC
 - Terraform state MUST NOT be stored in the repository. The configuration uses a remote GCS backend.
