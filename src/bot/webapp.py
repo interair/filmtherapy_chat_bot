@@ -244,6 +244,54 @@ async def save_upload(
     return safe_name
 
 
+class BookingView(pydantic.BaseModel):
+    id: str = ""
+    location: str = "Unknown"
+    session_type: str = "Unknown"
+    user_name: str = "Unknown"
+    user_id: str = "Unknown"
+    status: str = "Unknown"
+    status_color: str = "orange"
+    date_str: str = "Unknown"
+    time_str: str = "Unknown"
+    created_at: str = "Unknown"
+
+    @classmethod
+    def from_raw(cls, booking: dict) -> "BookingView":
+        status = booking.get('status', 'Unknown')
+        status_color = "green" if status == 'confirmed' else "orange"
+        user_name = booking.get('name') or ''
+        try:
+            user_name_safe = str(user_name) if user_name else 'Unknown'
+        except (ValueError, TypeError):
+            user_name_safe = 'Unknown'
+        start_iso = booking.get('start')
+        date_str = 'Unknown'
+        time_str = 'Unknown'
+        if isinstance(start_iso, str) and 'T' in start_iso:
+            parts = start_iso.split('T', 1)
+            dt = parts[0]
+            tm = parts[1][:5]
+            date_str = dt
+            time_str = tm
+        return cls(
+            id=str(booking.get('id', '') or ''),
+            location=str(booking.get('location', 'Unknown') or 'Unknown'),
+            session_type=str(booking.get('session_type', 'Unknown') or 'Unknown'),
+            user_name=user_name_safe,
+            user_id=str(booking.get('user_id', 'Unknown') or 'Unknown'),
+            status=str(status),
+            status_color=status_color,
+            date_str=date_str,
+            time_str=time_str,
+            created_at=str(booking.get('created_at', 'Unknown') or 'Unknown'),
+        )
+
+    @classmethod
+    def list_from_raw(cls, items: list[dict] | None) -> list["BookingView"]:
+        return [cls.from_raw(b or {}) for b in (items or [])]
+
+
 @app.get("/", response_class=HTMLResponse)
 async def web_index(request: Request, metrics = Depends(get_metrics_service), flags: QueryFlags = Depends(), _: None = Depends(verify_web_auth)):
     saved = flags.saved
@@ -254,25 +302,7 @@ async def web_index(request: Request, metrics = Depends(get_metrics_service), fl
     overview = metrics.today_overview()
     top_features = metrics.feature_usage(days=7, top_n=3)
     # Count bookings created today (UTC) for attention banner
-    new_bookings_today = 0
-    try:
-        raw_bookings = container.calendar_service().list_all_bookings()
-        if raw_bookings:
-            today_utc = datetime.utcnow().date()
-            for b in raw_bookings:
-                created = b.get('created_at') or b.get('created')
-                if isinstance(created, str) and created:
-                    try:
-                        dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                        d_utc = (dt.astimezone(timezone.utc).date() if dt.tzinfo else dt.date())
-                        if d_utc == today_utc:
-                            new_bookings_today += 1
-                    except Exception:
-                        logger.debug("Ignoring invalid booking created timestamp: %r", created, exc_info=True)
-                        continue
-    except Exception:
-        logger.exception("Failed to compute new bookings today")
-        new_bookings_today = 0
+    new_bookings_today = compute_new_bookings_today()
     return templates.TemplateResponse("index.html", {
         "request": request,
         "saved": saved,
@@ -500,35 +530,7 @@ async def web_quiz_save(
 async def web_bookings(request: Request, flags: QueryFlags = Depends(), _: None = Depends(verify_web_auth)):
     deleted = flags.deleted
     raw = container.calendar_service().list_all_bookings()
-    items = []
-    for booking in raw:
-        status = booking.get('status', 'Unknown')
-        status_color = "green" if status == 'confirmed' else "orange"
-        user_name = booking.get('name') or ''
-        try:
-            user_name_safe = str(user_name) if user_name else 'Unknown'
-        except (ValueError, TypeError):
-            user_name_safe = 'Unknown'
-        start_iso = booking.get('start')
-        date_str = 'Unknown'
-        time_str = 'Unknown'
-        if isinstance(start_iso, str) and 'T' in start_iso:
-            dt = start_iso.split('T', 1)[0]
-            tm = start_iso.split('T', 1)[1][:5]
-            date_str = dt
-            time_str = tm
-        items.append({
-            "id": booking.get('id', ''),
-            "location": booking.get('location', 'Unknown'),
-            "session_type": booking.get('session_type', 'Unknown'),
-            "user_name": user_name_safe,
-            "user_id": booking.get('user_id', 'Unknown'),
-            "status": status,
-            "status_color": status_color,
-            "date_str": date_str,
-            "time_str": time_str,
-            "created_at": booking.get('created_at', 'Unknown'),
-        })
+    items = BookingView.list_from_raw(raw)
     return templates.TemplateResponse("bookings.html", {"request": request, "items": items, "deleted": deleted})
 
 
@@ -1003,3 +1005,33 @@ def parse_title_code_lines(text: str) -> list[dict]:
         if title and code:
             items.append({"title": title, "code": code})
     return items
+
+
+
+def compute_new_bookings_today(bookings: Optional[list[dict]] = None, now: Optional[datetime] = None) -> int:
+    """Compute count of bookings created today (UTC).
+
+    If bookings is None, fetches them from the calendar service.
+    Accepts optional 'now' to aid testing; defaults to current UTC time.
+    Safely handles malformed timestamps and any repository exceptions.
+    """
+    new_bookings_today = 0
+    try:
+        raw_bookings = bookings if bookings is not None else container.calendar_service().list_all_bookings()
+        if raw_bookings:
+            today_utc = ((now or datetime.utcnow()).date())
+            for b in raw_bookings:
+                created = b.get('created_at') or b.get('created')
+                if isinstance(created, str) and created:
+                    try:
+                        dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                        d_utc = (dt.astimezone(timezone.utc).date() if dt.tzinfo else dt.date())
+                        if d_utc == today_utc:
+                            new_bookings_today += 1
+                    except Exception:
+                        logger.debug("Ignoring invalid booking created timestamp: %r", created, exc_info=True)
+                        continue
+    except Exception:
+        logger.exception("Failed to compute new bookings today")
+        new_bookings_today = 0
+    return new_bookings_today
