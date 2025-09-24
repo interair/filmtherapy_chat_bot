@@ -81,5 +81,9 @@ def get_metrics_service():
     return container.metrics_service()
 
 
+def get_calendar_service():
+    return container.calendar_service()
+
+
 def get_session_locations_repository():
     return container.session_locations_repository()

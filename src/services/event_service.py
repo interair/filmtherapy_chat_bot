@@ -16,8 +16,9 @@ class EventService:
     Wraps EventRepository to provide higher-level operations used by the web UI.
     """
 
-    def __init__(self) -> None:
-        self._repo = EventRepository()
+    def __init__(self, repo: EventRepository) -> None:
+        # Repository must be provided via DI
+        self._repo = repo
 
     async def list_upcoming_events(self) -> List[Event]:
         events = await self._repo.get_upcoming()

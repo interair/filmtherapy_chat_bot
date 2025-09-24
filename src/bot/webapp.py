@@ -35,8 +35,10 @@ from .dependencies import (
     get_metrics_service,
     get_event_registration_repository,
     get_session_locations_repository,
+    get_calendar_service,
 )
 from ..services.event_service import EventService
+from ..services.calendar_service import CalendarService
 from ..services.models import SessionType
 from ..exceptions import BotException
 from ..services.storage import read_json, write_json
@@ -563,9 +565,14 @@ async def web_quiz_save(
 
 
 @app.get("/bookings", response_class=HTMLResponse)
-async def web_bookings(request: Request, flags: QueryFlags = Depends(), _: None = Depends(verify_web_auth)):
+async def web_bookings(
+    request: Request,
+    calendar_service: CalendarService = Depends(get_calendar_service),
+    flags: QueryFlags = Depends(),
+    _: None = Depends(verify_web_auth),
+):
     deleted = flags.deleted
-    raw = container.calendar_service().list_all_bookings()
+    raw = calendar_service.list_all_bookings()
     items = BookingView.list_from_raw(raw)
     return templates.TemplateResponse("bookings.html", {"request": request, "items": items, "deleted": deleted})
 
@@ -1007,13 +1014,17 @@ async def web_metrics(request: Request, metrics = Depends(get_metrics_service), 
 
 
 @app.post("/bookings/delete")
-async def web_bookings_delete(request: Request, _: None = Depends(verify_web_auth)):
+async def web_bookings_delete(
+    request: Request,
+    calendar_service: CalendarService = Depends(get_calendar_service),
+    _: None = Depends(verify_web_auth),
+):
     data = await request.form()
     booking_id = str(data.get("id") or "").strip()
     if booking_id:
         logger.info("Web: bookings/delete id=%s", booking_id)
         try:
-            container.calendar_service().admin_delete_booking(booking_id)
+            calendar_service.admin_delete_booking(booking_id)
         except Exception:
             # Ignore errors for idempotency
             pass
@@ -1042,16 +1053,24 @@ def parse_title_code_lines(text: str) -> list[dict]:
 
 
 
-def compute_new_bookings_today(bookings: Optional[list[dict]] = None, now: Optional[datetime] = None) -> int:
+def compute_new_bookings_today(
+    bookings: Optional[list[dict]] = None,
+    now: Optional[datetime] = None,
+    calendar_service: Optional[CalendarService] = None,
+) -> int:
     """Compute count of bookings created today (UTC).
 
-    If bookings is None, fetches them from the calendar service.
+    If bookings is None, fetches them from the calendar service (DI-friendly if provided).
     Accepts optional 'now' to aid testing; defaults to current UTC time.
     Safely handles malformed timestamps and any repository exceptions.
     """
     new_bookings_today = 0
     try:
-        raw_bookings = bookings if bookings is not None else container.calendar_service().list_all_bookings()
+        if bookings is None:
+            svc = calendar_service or container.calendar_service()
+            raw_bookings = svc.list_all_bookings()
+        else:
+            raw_bookings = bookings
         if raw_bookings:
             today_utc = ((now or datetime.utcnow()).date())
             for b in raw_bookings:

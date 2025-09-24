@@ -46,7 +46,7 @@ class Container(containers.DeclarativeContainer):
         bookings_repo=booking_repository,
         schedule_repo=schedule_repository,
     )
-    event_service = providers.Singleton(EventService)
+    event_service = providers.Singleton(EventService, repo=event_repository)
     metrics_repository = providers.Singleton(MetricsRepository)
     metrics_service = providers.Singleton(MetricsService, repo=metrics_repository)
 
