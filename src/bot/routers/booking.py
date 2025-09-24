@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from ..booking_flow import BookingData
 from ..callbacks import encode_stype, encode_loc, decode_stype, decode_loc
@@ -74,6 +74,54 @@ def _payment_message_text(lang: str | None, suffix: str, price: float) -> tuple[
     price_label = "Цена" if (lang or "ru").startswith("ru") else "Price"
     price_str = f"{int(price) if float(price).is_integer() else price}€"
     return f"{msg_text}\n{price_label}: {price_str}\n{url}", url
+
+# --- Google Calendar link builder -----------------------------------
+from urllib.parse import urlencode, quote_plus
+
+def _fmt_gcal_datetime(dt: datetime) -> str:
+    # Ensure UTC and format as YYYYMMDDTHHMMSSZ
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    dt_utc = dt.astimezone(timezone.utc)
+    return dt_utc.strftime("%Y%m%dT%H%M%SZ")
+
+def _build_gcal_link_from_booking(booking: dict, lang: str | None) -> str | None:
+    if not isinstance(booking, dict):
+        return None
+    try:
+        s_s = booking.get("start")
+        e_s = booking.get("end")
+        if not isinstance(s_s, str):
+            return None
+        from_iso = datetime.fromisoformat
+        start_dt = from_iso(s_s.replace("Z", "+00:00"))
+        if isinstance(e_s, str):
+            end_dt = from_iso(e_s.replace("Z", "+00:00"))
+        else:
+            # fallback: +50 minutes
+            end_dt = start_dt + timedelta(minutes=50)
+    except Exception:
+        return None
+
+    title_raw = booking.get("session_type") or "Consultation"
+    title = title_raw
+    loc = booking.get("location") or ("Online" if not (lang or "ru").startswith("ru") else "Онлайн")
+    # Description can include booking id and a friendly note
+    bid = booking.get("id") or ""
+    who = booking.get("name") or ""
+    descr_en = f"Booking ID: {bid}. Client: {who}."
+    descr_ru = f"Номер брони: {bid}. Клиент: {who}."
+    details = descr_ru if (lang or "ru").startswith("ru") else descr_en
+
+    params = {
+        "action": "TEMPLATE",
+        "text": title,
+        "dates": f"{_fmt_gcal_datetime(start_dt)}/{_fmt_gcal_datetime(end_dt)}",
+        "location": loc,
+        "details": details,
+        "ctz": "UTC",
+    }
+    return "https://calendar.google.com/calendar/render?" + urlencode(params, quote_via=quote_plus)
 
 async def safe_cb_answer(cb: CallbackQuery, text: str | None = None, show_alert: bool = False) -> None:
     try:
@@ -439,7 +487,18 @@ async def pay(cb: CallbackQuery) -> None:
             await cb.message.answer(text, disable_web_page_preview=True)
         except Exception:
             await cb.message.answer(text)
-        await cb.answer()
+        # Always acknowledge callback to remove the loading state
+        with contextlib.suppress(Exception):
+            await cb.answer()
+
+        # Send a follow-up message with "Add to Google Calendar" button
+        gcal_link = _build_gcal_link_from_booking(booking, lang) if booking else None
+        if gcal_link:
+            btn_label = "Add to Google Calendar"
+            kbd = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=btn_label, url=gcal_link)]])
+            followup_text = "📅"
+            with contextlib.suppress(Exception):
+                await cb.message.answer(followup_text, reply_markup=kbd)
     else:
         await cb.answer(t(lang, "book.pay_unavailable"), show_alert=True)
 

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode, quote_plus
 
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, CallbackQuery, FSInputFile, InputMediaPhoto
+from aiogram.types import Message, CallbackQuery, FSInputFile, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
 
 from ..utils import user_lang, ik_kbd
 from ...container import container
@@ -59,6 +61,53 @@ def _format_event_poster_text(item, lang: str) -> str:
     if len(text) > 1024:
         text = text[:1021] + "..."
     return text
+
+# --- Google Calendar link builder for cinema events -----------------
+
+def _fmt_gcal_datetime(dt: datetime) -> str:
+    # Ensure UTC and format as YYYYMMDDTHHMMSSZ
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    dt_utc = dt.astimezone(timezone.utc)
+    return dt_utc.strftime("%Y%m%dT%H%M%SZ")
+
+
+def _build_gcal_link_from_event(ev, lang: str | None) -> str | None:
+    try:
+        start = getattr(ev, "when", None)
+    except Exception:
+        start = None
+    if start is None:
+        return None
+    if isinstance(start, str):
+        try:
+            start = datetime.fromisoformat(start.replace("Z", "+00:00"))
+        except Exception:
+            return None
+    # End time: assume 2 hours duration for film club events
+    end = start + timedelta(hours=2)
+
+    title = getattr(ev, "title", None) or ("Киноклуб" if (lang or "ru").startswith("ru") else "Film club")
+    loc = getattr(ev, "place", None) or ""
+    ev_id = getattr(ev, "id", "")
+    descr_src = getattr(ev, "description", None)
+    try:
+        descr_src = str(descr_src).strip() if descr_src is not None else ""
+    except Exception:
+        descr_src = ""
+    descr_en = f"Film club. Event ID: {ev_id}. {descr_src}".strip()
+    descr_ru = f"Киноклуб. ID события: {ev_id}. {descr_src}".strip()
+    details = descr_ru if (lang or "ru").startswith("ru") else descr_en
+
+    params = {
+        "action": "TEMPLATE",
+        "text": title,
+        "dates": f"{_fmt_gcal_datetime(start)}/{_fmt_gcal_datetime(end)}",
+        "location": loc,
+        "details": details,
+        "ctz": "UTC",
+    }
+    return "https://calendar.google.com/calendar/render?" + urlencode(params, quote_via=quote_plus)
 
 # Main Film club button -> show submenu
 @router.message(F.text.in_({"Киноклуб", "Film club", "🎬 Киноклуб", "🎬 Film club"}))
@@ -251,7 +300,20 @@ async def pay_event(cb: CallbackQuery) -> None:
             await cb.message.answer(text, disable_web_page_preview=True)
         except Exception:
             await cb.message.answer(text)
-        await cb.answer()
+        # Always acknowledge callback to remove loading state
+        try:
+            await cb.answer()
+        except Exception:
+            pass
+        # Send Google Calendar button
+        gcal_link = _build_gcal_link_from_event(ev, lang) if ev else None
+        if gcal_link:
+            btn_label = "Add to Google Calendar"
+            kbd = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=btn_label, url=gcal_link)]])
+            try:
+                await cb.message.answer("📅", reply_markup=kbd)
+            except Exception:
+                pass
     else:
         await cb.answer(t(lang, "book.pay_unavailable"), show_alert=True)
 
