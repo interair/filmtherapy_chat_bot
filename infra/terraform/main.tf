@@ -253,8 +253,8 @@ resource "google_cloud_run_v2_service" "app" {
 
       resources {
         limits = {
-          memory = "1Gi"
-          cpu    = "2"    # For fast start
+          memory = "512Mi"
+          cpu    = "1"    # For fast start
         }
         cpu_idle = true     # Allow CPU to idle when not processing
         startup_cpu_boost = true  # Faster cold starts by boosting CPU during startup
