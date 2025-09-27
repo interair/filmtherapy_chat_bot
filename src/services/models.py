@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 class SessionType(Enum):
@@ -47,11 +50,40 @@ class Booking(BaseModel):
     start: datetime
     end: datetime
     location: Optional[str] = None
-    session_type: Optional[str] = None
-    status: Optional[str] = None
+    session_type: Optional[SessionType] = None
+    status: Optional[BookingStatus] = None
     price: Optional[float] = None
     created_at: Optional[datetime] = None
+
+    # Shared enum coercion for validators
+    @classmethod
+    def _coerce_enum(cls, v, enum_cls: type[Enum], field_name: str):
+        # Allow passing through None or already-correct enum
+        if v is None or isinstance(v, enum_cls):
+            return v
+        try:
+            s = str(v).strip()
+        except (ValueError, TypeError):
+            logger.error("Invalid %s value: %r", field_name, v, exc_info=True)
+            return None
+        # Match by value or by enum name (case-insensitive)
+        for item in enum_cls:
+            if s == item.value or s.lower() == item.name.lower():
+                return item
+        return None
+
+    # Coerce incoming strings into enums and allow None
+    @field_validator("session_type", mode="before")
+    @classmethod
+    def _validate_session_type(cls, v):
+        return cls._coerce_enum(v, SessionType, "session_type")
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _validate_status(cls, v):
+        return cls._coerce_enum(v, BookingStatus, "status")
 
     class Config:
         populate_by_name = True
         str_strip_whitespace = True
+        use_enum_values = True
