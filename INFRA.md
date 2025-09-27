@@ -3,7 +3,7 @@
 Minimal GCP infra to run on Cloud Run and persist small files via GCS.
 
 Creates
-- GCS bucket for data persistence
+- GCS bucket for data persistence (images)
 - Service accounts: runtime (for Cloud Run) and deployer (for CI)
 - Optional WIF (Workload Identity Federation) for GitHub OIDC
 - Required API enablement (Run, Artifact Registry, IAM Credentials, Storage) and IAM bindings

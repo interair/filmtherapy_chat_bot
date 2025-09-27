@@ -25,7 +25,7 @@ Internal project. Documentation is for our team; external contributions are not 
 - ADMINS: comma-separated Telegram user IDs
 - DEFAULT_LANG: ru|en (ru by default)
 - WEB_USERNAME / WEB_PASSWORD: enable web admin (http://localhost:8080)
-- USE_WEBHOOK, BASE_URL: optional for production webhooks
+- USE_WEBHOOK, BASE_URL, TELEGRAM_WEBHOOK_SECRET: optional for production webhooks
 
 See .env.example for the full list.
 
