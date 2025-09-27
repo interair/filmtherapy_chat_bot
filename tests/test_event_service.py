@@ -1,6 +1,7 @@
 import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
+from datetime import datetime
 
 from src.services.event_service import EventService
 from src.services.models import Event, EventCreate
@@ -9,9 +10,9 @@ from src.services.models import Event, EventCreate
 @pytest.mark.asyncio
 async def test_list_upcoming_events_returns_repo_results():
     # Arrange
-    from datetime import datetime
-    ev1 = Event(id="e1", title="T1", when=datetime.now(), place="P1")
-    ev2 = Event(id="e2", title="T2", when=datetime.now(), place="P2", price=10.5)
+    event_time = datetime(2025, 6, 1, 18, 0, 0)
+    ev1 = Event(id="e1", title="T1", when=event_time, place="P1")
+    ev2 = Event(id="e2", title="T2", when=event_time, place="P2", price=10.5)
     mock_repo = SimpleNamespace(
         get_upcoming=AsyncMock(return_value=[ev1, ev2])
     )
@@ -28,15 +29,12 @@ async def test_list_upcoming_events_returns_repo_results():
 @pytest.mark.asyncio
 async def test_create_event_generates_uuid_and_calls_repo(monkeypatch):
     # Arrange
-    from datetime import datetime
-
-    class _FakeUUID:
-        def __str__(self):
-            return "11111111-2222-3333-4444-555555555555"
+    fake_uuid_str = "11111111-2222-3333-4444-555555555555"
+    fake_uuid_obj = SimpleNamespace(__str__=lambda: fake_uuid_str)
 
     # Patch uuid.uuid4 used inside the service module
     import src.services.event_service as event_service_mod
-    monkeypatch.setattr(event_service_mod.uuid, "uuid4", lambda: _FakeUUID())
+    monkeypatch.setattr(event_service_mod.uuid, "uuid4", lambda: fake_uuid_obj)
 
     # Mock repo so that create returns the same event it receives
     mock_repo = SimpleNamespace(
@@ -56,13 +54,9 @@ async def test_create_event_generates_uuid_and_calls_repo(monkeypatch):
     created = await service.create_event(dto)
 
     # Assert
-    assert created.id == "event-11111111-2222-3333-4444-555555555555"
-    assert created.title == dto.title
-    assert created.when == dto.when
-    assert created.place == dto.place
-    assert created.price == dto.price
-    assert created.description == dto.description
-    mock_repo.create.assert_awaited_once()
+    expected_event = Event(id=f"event-{fake_uuid_str}", **dto.model_dump())
+    assert created == expected_event
+    mock_repo.create.assert_awaited_once_with(expected_event)
 
 
 @pytest.mark.asyncio
