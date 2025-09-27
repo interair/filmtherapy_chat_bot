@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-from .models import Event
+from .models import Event, EventCreate
 from .repositories import EventRepository
 
 logger = logging.getLogger(__name__)
@@ -27,29 +27,25 @@ class EventService:
 
     async def create_event(
         self,
-        title: str,
-        when: datetime,
-        place: str,
-        price: Optional[float] = None,
-        description: Optional[str] = None,
+        dto: EventCreate,
     ) -> Event:
         # Generate a simple unique ID based on timestamp
         event_id = f"event-{int(datetime.utcnow().timestamp())}"
         logger.info(
             "EventService: create_event id=%s title=%s when=%s place=%s price=%s",
             event_id,
-            title,
-            when.isoformat() if hasattr(when, "isoformat") else str(when),
-            place,
-            str(price) if price is not None else "",
+            dto.title,
+            dto.when.isoformat() if hasattr(dto.when, "isoformat") else str(dto.when),
+            dto.place,
+            str(dto.price) if dto.price is not None else "",
         )
         ev = Event(
             id=event_id,
-            title=title,
-            when=when,
-            place=place,
-            price=price,
-            description=description,
+            title=dto.title,
+            when=dto.when,
+            place=dto.place,
+            price=dto.price,
+            description=dto.description,
         )
         created = await self._repo.create(ev)
         logger.info("EventService: created id=%s", created.id)

@@ -39,7 +39,7 @@ from .dependencies import (
 )
 from ..services.event_service import EventService
 from ..services.calendar_service import CalendarService
-from ..services.models import SessionType
+from ..services.models import SessionType, EventCreate
 from ..exceptions import BotException
 from ..services.storage import read_json, write_json
 
@@ -969,13 +969,14 @@ async def create_event(
     """Create new event from form data and redirect to listing."""
     form_data = await request.form()
     try:
-        event = await event_service.create_event(
+        dto = EventCreate(
             title=str(form_data["title"]),
             when=datetime.fromisoformat(str(form_data["when"])),
             place=str(form_data["place"]),
             price=(float(form_data["price"]) if form_data.get("price") else None),
             description=str(form_data.get("description", "") or None),
         )
+        await event_service.create_event(dto)
         return RedirectResponse(url="/events?created=1", status_code=302)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

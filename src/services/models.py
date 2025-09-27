@@ -41,6 +41,19 @@ class Event(BaseModel):
         str_strip_whitespace = True
 
 
+class EventCreate(BaseModel):
+    """DTO for creating Event instances."""
+    title: str = Field(..., min_length=1)
+    when: datetime
+    place: str = Field(..., min_length=1)
+    price: Optional[float] = None
+    description: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
+        str_strip_whitespace = True
+
+
 class Booking(BaseModel):
     id: str = Field(..., min_length=1)
     user_id: Optional[str] = None
