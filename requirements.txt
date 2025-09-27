@@ -11,3 +11,7 @@ dependency-injector==4.48.2
 google-cloud-firestore==2.21.0
 # Ensure a grpcio version with Python 3.13 wheels is selected.
 grpcio==1.75.0
+
+# Test dependencies
+pytest==8.3.3
+pytest-asyncio==0.23.8
