@@ -174,6 +174,13 @@ async def film_club_about(message: Message) -> None:
                 except Exception:
                     continue
 
+    # After displaying content, show the Schedule button again (single button)
+    is_ru = (lang or "ru").startswith("ru")
+    schedule_label = "🗓️ Расписание" if is_ru else "🗓️ Schedule"
+    kbd = ik_kbd([[(schedule_label, "cinema:schedule")]])
+    # Send a short prompt with the button so it appears at the bottom of the chat
+    await message.answer(schedule_label, reply_markup=kbd)
+
 
 @router.callback_query(F.data == "cinema:about")
 async def cb_cinema_about(cb: CallbackQuery) -> None:
@@ -203,6 +210,13 @@ async def cb_cinema_about(cb: CallbackQuery) -> None:
                     await cb.message.answer_photo(m.media)  # type: ignore[arg-type]
                 except Exception:
                     continue
+
+    # After displaying content, show the Schedule button again (single button)
+    is_ru = (lang or "ru").startswith("ru")
+    schedule_label = "🗓️ Расписание" if is_ru else "🗓️ Schedule"
+    kbd = ik_kbd([[(schedule_label, "cinema:schedule")]])
+    await cb.message.answer(schedule_label, reply_markup=kbd)
+
     await cb.answer()
 
 
