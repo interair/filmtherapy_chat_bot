@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import datetime
 from typing import List, Optional
 
@@ -29,8 +30,7 @@ class EventService:
         self,
         dto: EventCreate,
     ) -> Event:
-        # Generate a simple unique ID based on timestamp
-        event_id = f"event-{int(datetime.utcnow().timestamp())}"
+        event_id = f"event-{uuid.uuid4()}"
         logger.info(
             "EventService: create_event id=%s title=%s when=%s place=%s price=%s",
             event_id,

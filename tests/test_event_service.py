@@ -26,25 +26,17 @@ async def test_list_upcoming_events_returns_repo_results():
 
 
 @pytest.mark.asyncio
-async def test_create_event_generates_id_and_calls_repo(monkeypatch):
+async def test_create_event_generates_uuid_and_calls_repo(monkeypatch):
     # Arrange
     from datetime import datetime
 
-    class _FakeNow:
-        def __init__(self, ts: int):
-            self._ts = ts
+    class _FakeUUID:
+        def __str__(self):
+            return "11111111-2222-3333-4444-555555555555"
 
-        def timestamp(self) -> int:
-            return self._ts
-
-    class _FakeDatetime:
-        @staticmethod
-        def utcnow():
-            return _FakeNow(1234567890)
-
-    # Patch datetime used inside the service module
+    # Patch uuid.uuid4 used inside the service module
     import src.services.event_service as event_service_mod
-    monkeypatch.setattr(event_service_mod, "datetime", _FakeDatetime)
+    monkeypatch.setattr(event_service_mod.uuid, "uuid4", lambda: _FakeUUID())
 
     # Mock repo so that create returns the same event it receives
     mock_repo = SimpleNamespace(
@@ -64,7 +56,7 @@ async def test_create_event_generates_id_and_calls_repo(monkeypatch):
     created = await service.create_event(dto)
 
     # Assert
-    assert created.id == "event-1234567890"
+    assert created.id == "event-11111111-2222-3333-4444-555555555555"
     assert created.title == dto.title
     assert created.when == dto.when
     assert created.place == dto.place
