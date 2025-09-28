@@ -109,6 +109,39 @@ def _build_gcal_link_from_event(ev, lang: str | None) -> str | None:
     }
     return "https://calendar.google.com/calendar/render?" + urlencode(params, quote_via=quote_plus)
 
+
+async def _send_about_photos(msg: Message) -> None:
+    """Send cinema about photos as a media group with fallback to singles.
+
+    Builds media from files listed by about_repository (max 10), tries to
+    send as a media group, and if that fails (e.g., due to file issues
+    or Telegram constraints), sends photos one by one.
+    """
+    try:
+        items = container.about_repository().list_cinema_photos()
+    except Exception:
+        items = []
+
+    media: list[InputMediaPhoto] = []
+    for fn in items[:10]:  # Telegram limit per media group
+        p = Path(DATA_DIR) / fn
+        if p.exists():
+            try:
+                media.append(InputMediaPhoto(media=FSInputFile(str(p))))
+            except Exception:
+                continue
+    if not media:
+        return
+
+    try:
+        await msg.answer_media_group(media)
+    except Exception:
+        for m in media:
+            try:
+                await msg.answer_photo(m.media)  # type: ignore[arg-type]
+            except Exception:
+                continue
+
 # Main Film club button -> show submenu
 @router.message(F.text.in_({"Киноклуб", "Film club", "🎬 Киноклуб", "🎬 Film club"}))
 async def film_club_menu(message: Message, state: FSMContext) -> None:
@@ -151,28 +184,7 @@ async def film_club_about(message: Message) -> None:
     await message.answer(about_text)
 
     # Then send photo group (0..many)
-    try:
-        items = container.about_repository().list_cinema_photos()
-    except Exception:
-        items = []
-    media = []
-    for fn in items[:10]:  # Telegram limit per media group
-        p = Path(DATA_DIR) / fn
-        if p.exists():
-            try:
-                media.append(InputMediaPhoto(media=FSInputFile(str(p))))
-            except Exception:
-                continue
-    if media:
-        try:
-            await message.answer_media_group(media)
-        except Exception:
-            # Fallback: send sequentially if media group fails
-            for m in media:
-                try:
-                    await message.answer_photo(m.media)  # type: ignore[arg-type]
-                except Exception:
-                    continue
+    await _send_about_photos(message)
 
     # After displaying content, show the Schedule button again (single button)
     is_ru = (lang or "ru").startswith("ru")
@@ -189,27 +201,7 @@ async def cb_cinema_about(cb: CallbackQuery) -> None:
     # Send text first
     await cb.message.answer(about_text)
     # Then photos (if any)
-    try:
-        items = container.about_repository().list_cinema_photos()
-    except Exception:
-        items = []
-    media = []
-    for fn in items[:10]:
-        p = Path(DATA_DIR) / fn
-        if p.exists():
-            try:
-                media.append(InputMediaPhoto(media=FSInputFile(str(p))))
-            except Exception:
-                continue
-    if media:
-        try:
-            await cb.message.answer_media_group(media)
-        except Exception:
-            for m in media:
-                try:
-                    await cb.message.answer_photo(m.media)  # type: ignore[arg-type]
-                except Exception:
-                    continue
+    await _send_about_photos(cb.message)
 
     # After displaying content, show the Schedule button again (single button)
     is_ru = (lang or "ru").startswith("ru")
