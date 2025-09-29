@@ -101,11 +101,11 @@ class BookingFlow:
         return dates
 
     async def _get_schedule_rules(self):
-        """Cache schedule rules for 5 minutes"""
+        """Cache schedule rules briefly to reduce Firestore reads (5 seconds TTL)."""
         now = datetime.utcnow()
         if (self._schedule_cache is None or 
             self._schedule_cache_time is None or 
-            (now - self._schedule_cache_time).total_seconds() > 300):  # 5 minutes cache
+            (now - self._schedule_cache_time).total_seconds() > 5):  # 5 seconds cache
             
             cfg = self.calendar._schedule_repo.get_sync()
             self._schedule_cache = cfg.get("rules", []) if isinstance(cfg, dict) else []
