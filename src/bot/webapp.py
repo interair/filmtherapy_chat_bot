@@ -13,11 +13,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 import uvicorn
-import logging
 import pydantic
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import Update
+
+import logging
 
 from ..config import settings
 from ..i18n.texts import RU, EN
@@ -651,7 +652,7 @@ async def web_schedule_save(
                 if d < datetime.now(timezone.utc).date():
                     continue
             except Exception:
-                # Invalid date format; skip
+                logger.warning("Skipping schedule line %d: invalid date format '%s' (expected dd-mm-yy)", i + 1, date_str)
                 continue
             try:
                 rule_models.append(ScheduleRule(
@@ -664,6 +665,7 @@ async def web_schedule_save(
                     session_type=sess,
                 ))
             except Exception:
+                logger.error("Unexpected error processing schedule line %d '%s': %s", i + 1, line, e, exc_info=True)
                 continue
 
     logger.info("Web: schedule/save rules=%d", len(rule_models))

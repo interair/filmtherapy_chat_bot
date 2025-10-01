@@ -47,7 +47,8 @@ def _num_price(val: str | float | int, default: float = 90.0) -> float:
         if isinstance(val, (int, float)):
             return float(val)
         return float(str(val).replace(",", ".").strip())
-    except Exception:
+    except (ValueError, TypeError) as e:
+        logger.debug("Failed to parse price value %s, using default %s: %s", val, default, e)
         return float(default)
 
 def _get_price(lang: str | None, suffix: str) -> float:
@@ -63,7 +64,8 @@ def _payment_message_text(lang: str | None, suffix: str, price: float) -> tuple[
         msg_text = (t(lang, f"book.payment_link.{suffix}") or "").strip()
         if not msg_text or msg_text == f"book.payment_link.{suffix}":
             msg_text = t(lang, "book.payment_link")
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to get payment message text for suffix=%s: %s", suffix, e)
         msg_text = t(lang, "book.payment_link")
     try:
         url = (t(lang, "book.payment_url") or "").strip()
@@ -100,7 +102,8 @@ def _build_gcal_link_from_booking(booking: dict, lang: str | None) -> str | None
         else:
             # fallback: +50 minutes
             end_dt = start_dt + timedelta(minutes=50)
-    except Exception:
+    except (ValueError, TypeError, AttributeError) as e:
+        logger.warning("Failed to parse booking dates for calendar link, booking_id=%s: %s", booking.get("id"), e)
         return None
 
     title_raw = booking.get("session_type") or "Consultation"
@@ -191,16 +194,16 @@ async def _get_locations_list(session_type: str | None) -> list[str]:
             arr = m.get(str(session_type).strip())
             if isinstance(arr, list) and len(arr) > 0:
                 return [str(x) for x in arr]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to fetch session-specific locations for type=%s: %s", session_type, e)
     # Fallback to all known locations from repo
     try:
         models = await container.location_repository().get_all()
         locs = [l.name for l in models]
         if locs:
             return locs
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to fetch all locations from repository: %s", e, exc_info=True)
     # Fallback to built-in defaults
     from ...services.calendar_service import LOCATIONS as DEFAULT_LOCS
     return list(DEFAULT_LOCS)
@@ -290,19 +293,19 @@ async def paginate_dates(cb: CallbackQuery, state: FSMContext) -> None:
     loc_code = parts[3]
     try:
         page = int(parts[4])
-    except Exception:
-        logger.debug("Invalid page index in dates pagination: %r", parts[4] if len(parts) > 4 else None, exc_info=True)
+    except (ValueError, TypeError) as e:
+        logger.warning("Invalid page index in dates pagination: %r, error: %s", parts[4] if len(parts) > 4 else None, e)
         page = 0
     # Restore state if lost: decode stype/loc from codes
     try:
         session_type = decode_stype(st_code)
-    except Exception:
-        logger.debug("Failed to decode session type from code: %r", st_code, exc_info=True)
+    except Exception as e:
+        logger.warning("Failed to decode session type from code: %r, error: %s", st_code, e)
         session_type = None
     try:
         location = await decode_loc(loc_code)
-    except Exception:
-        logger.debug("Failed to decode location from code: %r", loc_code, exc_info=True)
+    except Exception as e:
+        logger.warning("Failed to decode location from code: %r, error: %s", loc_code, e)
         location = None
     if session_type is not None:
         await state.update_data(session_type=session_type)
@@ -351,8 +354,8 @@ async def choose_date(cb: CallbackQuery, state: FSMContext) -> None:
         session_type = decode_stype(st_code)
         location = await decode_loc(loc_code)
         await state.update_data(session_type=session_type, location=location)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to decode session type or location, st_code=%s, loc_code=%s: %s", st_code, loc_code, e)
     logger.info("Booking: user %s chose date %s", getattr(cb.from_user, "id", None), date)
     await state.update_data(date=date)
     with contextlib.suppress(Exception):
@@ -467,7 +470,8 @@ async def pay(cb: CallbackQuery) -> None:
     # Resolve booking and session type
     try:
         booking = repo.get_by_id_sync(booking_id) if booking_id else None
-    except Exception:
+    except Exception as e:
+        logger.error("Failed to fetch booking id=%s: %s", booking_id, e, exc_info=True)
         booking = None
     stype = (booking.get("session_type") if isinstance(booking, dict) else None) or ""
     suffix = _stype_suffix(stype)
@@ -477,8 +481,8 @@ async def pay(cb: CallbackQuery) -> None:
     try:
         if booking_id:
             repo.patch_sync(booking_id, {"price": float(price_val)})
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to update price for booking id=%s: %s", booking_id, e)
 
     # Compose payment message
     text, url = _payment_message_text(lang, suffix, price_val)
@@ -526,7 +530,8 @@ async def my_bookings(message: Message) -> None:
     session_items = []
     try:
         session_items = container.calendar_service().list_user_bookings(uid) or []
-    except Exception:
+    except Exception as e:
+        logger.error("Failed to fetch user bookings for user_id=%s: %s", uid, e, exc_info=True)
         session_items = []
 
     # Collect cinema registrations
@@ -541,7 +546,8 @@ async def my_bookings(message: Message) -> None:
                 continue
             try:
                 ev = await event_repo.get_by_id(ev_id)
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to fetch event id=%s for user=%s: %s", ev_id, uid, e)
                 ev = None
             if not ev:
                 continue
@@ -554,7 +560,8 @@ async def my_bookings(message: Message) -> None:
                     when_utc = when_dt
                     when_str = when_utc.strftime("%Y-%m-%d %H:%M")
                     ts_sort = when_utc.timestamp()
-                except Exception:
+                except (ValueError, TypeError, AttributeError) as e:
+                    logger.debug("Failed to format event datetime for event_id=%s: %s", ev_id, e)
                     when_str = str(when_dt)
                     ts_sort = 0.0
             cinema_items.append({
@@ -565,7 +572,8 @@ async def my_bookings(message: Message) -> None:
                 "title": getattr(ev, "title", ""),
                 "place": getattr(ev, "place", ""),
             })
-    except Exception:
+    except Exception as e:
+        logger.error("Failed to fetch cinema registrations for user_id=%s: %s", uid, e, exc_info=True)
         cinema_items = []
 
     # Transform session bookings into unified items
@@ -582,7 +590,8 @@ async def my_bookings(message: Message) -> None:
                 # Attempt to parse for sorting
                 try:
                     ts = datetime.fromisoformat(start_iso.replace("Z", "+00:00")).timestamp()
-                except Exception:
+                except (ValueError, TypeError) as e:
+                    logger.debug("Failed to parse booking start time for sorting: %s", e)
                     ts = 0.0
             location = b.get("location") or "Online"
             stype = b.get("session_type") or "Session"
@@ -596,7 +605,8 @@ async def my_bookings(message: Message) -> None:
                 "stype": stype,
                 "status": status,
             })
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to parse booking item: %s, error: %s", b, e)
             continue
 
     # Append cinema items

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json as _json
+import logging
 import os
 import time
 from abc import ABC, abstractmethod
@@ -15,7 +16,7 @@ try:
 except ImportError:
     _orjson = None
 
-from ..exceptions import ValidationError, NotFoundError
+from ..exceptions import NotFoundError, ValidationError
 
 from .models import Event, Booking, Location, ScheduleRule
 from .storage import (
@@ -26,8 +27,9 @@ from .storage import (
 from .firestore_client import get_client
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
+logger = logging.getLogger(__name__)
 
 # Fast model validation cache for identical data payloads
 
@@ -121,7 +123,8 @@ class FirestoreRepository(Generic[T]):
             try:
                 payload = _dumps_sorted_bytes(data)
                 items.append(_validate_cached(self.model_class, payload))
-            except (PydanticValidationError, ValueError, TypeError):
+            except (PydanticValidationError, ValueError, TypeError) as e:
+                logger.warning("Failed to validate document id=%s in collection: %s", doc.id, e, exc_info=True)
                 continue
         return items
 
@@ -211,10 +214,12 @@ class EventRepository(Repository[Event]):
             try:
                 payload = _dumps_sorted_bytes(data)
                 items.append(_validate_cached(Event, payload))
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to validate event from cached payload, doc_id=%s: %s", doc.id, e)
                 try:
                     items.append(Event.model_validate(data))
-                except Exception:
+                except Exception as e2:
+                    logger.error("Failed to validate event doc_id=%s: %s", doc.id, e2, exc_info=True)
                     continue
         return items
 
@@ -230,7 +235,8 @@ class LocationRepository(Repository[Location]):
             name = doc.id
             try:
                 items.append(Location(name=str(name)))
-            except Exception:
+            except Exception as e:
+                logger.error("Failed to create Location from doc_id=%s: %s", doc.id, e, exc_info=True)
                 continue
         return items
 
@@ -292,7 +298,8 @@ class QuizRepository:
             try:
                 title = str(it.get("title", "")).strip()
                 code = str(it.get("code", "")).strip()
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to parse mood item %s: %s", it, e)
                 continue
             if title and code and code not in seen_codes:
                 norm_moods.append({"title": title, "code": code})
@@ -303,7 +310,8 @@ class QuizRepository:
             try:
                 title = str(it.get("title", "")).strip()
                 code = str(it.get("code", "")).strip()
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to parse company item %s: %s", it, e)
                 continue
             if title and code and code not in seen_cc:
                 norm_companies.append({"title": title, "code": code})
@@ -485,7 +493,8 @@ class ScheduleRepository:
         for it in (rules_in or []):
             try:
                 out.append(ScheduleRule.model_validate(it))
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to validate ScheduleRule item %s: %s", it, e, exc_info=True)
                 continue
         return out
 
@@ -505,10 +514,12 @@ class ScheduleRepository:
             try:
                 payload = _dumps_sorted_bytes(data)
                 items.append(_validate_cached(ScheduleRule, payload))
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to validate ScheduleRule from cached payload, doc_id=%s: %s", doc.id, e)
                 try:
                     items.append(ScheduleRule.model_validate(data))
-                except Exception:
+                except Exception as e2:
+                    logger.error("Failed to validate ScheduleRule doc_id=%s: %s", doc.id, e2, exc_info=True)
                     continue
         items.sort(key=lambda r: (r.date, r.start))
         return items
