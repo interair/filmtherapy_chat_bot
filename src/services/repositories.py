@@ -491,34 +491,23 @@ class ScheduleRepository:
         session_type = str(rule.get("session_type") or "").strip()
         return f"{date}|{start}|{location}|{session_type}"
 
-    @staticmethod
-    def _doc_to_rule(data: Dict[str, Any], doc_id: str) -> Optional[ScheduleRule]:
-        try:
-            # Ensure interval default and trimmed strings are handled by model
-            payload = {
-                "id": doc_id,
-                "date": str(data.get("date", "")).strip(),
-                "start": str(data.get("start", "")).strip(),
-                "end": str(data.get("end", "")).strip(),
-                "duration": data.get("duration", 50),
-                "interval": data.get("interval", None),
-                "location": data.get("location", ""),
-                "session_type": data.get("session_type", ""),
-            }
-            return ScheduleRule.model_validate(payload)
-        except Exception:
-            return None
 
     async def get(self) -> List[ScheduleRule]:
         """Return all schedule rules as typed models."""
-        rules: List[ScheduleRule] = []
+        items: List[ScheduleRule] = []
         for doc in self._col.stream():
-            d = doc.to_dict() or {}
-            r = self._doc_to_rule(d, doc.id)
-            if r is not None:
-                rules.append(r)
-        rules.sort(key=lambda r: (r.date, r.start))
-        return rules
+            data = doc.to_dict() or {}
+            data.setdefault("id", doc.id)
+            try:
+                payload = _dumps_sorted_bytes(data)
+                items.append(_validate_cached(ScheduleRule, payload))
+            except Exception:
+                try:
+                    items.append(ScheduleRule.model_validate(data))
+                except Exception:
+                    continue
+        items.sort(key=lambda r: (r.date, r.start))
+        return items
 
     async def save(self, rules_in: List[ScheduleRule]) -> None:
         new_rules = self._normalize_rules(rules_in)
@@ -539,14 +528,20 @@ class ScheduleRepository:
 
     # Synchronous helpers for non-async contexts
     def get_sync(self) -> List[ScheduleRule]:
-        rules: List[ScheduleRule] = []
+        items: List[ScheduleRule] = []
         for doc in self._col.stream():
-            d = doc.to_dict() or {}
-            r = self._doc_to_rule(d, doc.id)
-            if r is not None:
-                rules.append(r)
-        rules.sort(key=lambda r: (r.date, r.start))
-        return rules
+            data = doc.to_dict() or {}
+            data.setdefault("id", doc.id)
+            try:
+                payload = _dumps_sorted_bytes(data)
+                items.append(_validate_cached(ScheduleRule, payload))
+            except Exception:
+                try:
+                    items.append(ScheduleRule.model_validate(data))
+                except Exception:
+                    continue
+        items.sort(key=lambda r: (r.date, r.start))
+        return items
 
     def save_sync(self, rules_in: List[ScheduleRule | Dict[str, Any]]) -> None:
         new_rules = self._normalize_rules(rules_in)
@@ -563,22 +558,12 @@ class ScheduleRepository:
 
     # Optional typed API for future usage
     async def get_all_rules(self) -> List[ScheduleRule]:
-        items: List[ScheduleRule] = []
-        for doc in self._col.stream():
-            r = self._doc_to_rule(doc.to_dict() or {}, doc.id)
-            if r:
-                items.append(r)
-        items.sort(key=lambda r: (r.date, r.start))
-        return items
+        # Delegate to get() to keep behavior consistent
+        return await self.get()
 
     def get_all_rules_sync(self) -> List[ScheduleRule]:
-        items: List[ScheduleRule] = []
-        for doc in self._col.stream():
-            r = self._doc_to_rule(doc.to_dict() or {}, doc.id)
-            if r:
-                items.append(r)
-        items.sort(key=lambda r: (r.date, r.start))
-        return items
+        # Delegate to get_sync() to keep behavior consistent
+        return self.get_sync()
 
 
 class BookingRepository(Repository[Booking]):
