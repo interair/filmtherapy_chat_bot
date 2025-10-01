@@ -109,8 +109,8 @@ class BookingFlow:
             self._schedule_cache_time is None or 
             (now - self._schedule_cache_time).total_seconds() > 5):  # 5 seconds cache
             
-            cfg = self.calendar._schedule_repo.get_sync()
-            self._schedule_cache = cfg.get("rules", []) if isinstance(cfg, dict) else []
+            rules_models = self.calendar._schedule_repo.get_sync()
+            self._schedule_cache = [r.model_dump(mode="python", exclude={"id"}) for r in (rules_models or [])]
             self._schedule_cache_time = now
         
         return self._schedule_cache

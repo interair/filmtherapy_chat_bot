@@ -39,7 +39,7 @@ from .dependencies import (
 )
 from ..services.event_service import EventService
 from ..services.calendar_service import CalendarService
-from ..services.models import SessionType, EventCreate
+from ..services.models import SessionType, EventCreate, ScheduleRule
 from ..exceptions import BotException
 from ..services.storage import read_json, write_json
 
@@ -586,8 +586,7 @@ async def web_schedule(
     _: None = Depends(verify_web_auth),
 ):
     saved = flags.saved
-    cfg = await sched_repo.get()
-    rules = cfg.get("rules", []) if isinstance(cfg, dict) else []
+    rules = await sched_repo.get()
     # Load available locations for dropdown
     try:
         loc_items = await loc_repo.get_all()
@@ -629,7 +628,8 @@ async def web_schedule_save(
     session_types = _list("session_type")
 
     n = max(len(dates), len(starts), len(ends), len(durations), len(intervals), len(locations), len(session_types))
-    rules = []
+    # Build typed ScheduleRule objects directly
+    rule_models: list[ScheduleRule] = []
     for i in range(n):
         date_str = str(dates[i]).strip() if i < len(dates) else ""
         start = str(starts[i]) if i < len(starts) else ""
@@ -653,18 +653,21 @@ async def web_schedule_save(
             except Exception:
                 # Invalid date format; skip
                 continue
-            rules.append({
-                "date": date_str,
-                "start": start,
-                "end": end,
-                "duration": duration,
-                "interval": interval,
-                "location": location,
-                "session_type": sess,
-            })
+            try:
+                rule_models.append(ScheduleRule(
+                    date=date_str,
+                    start=start,
+                    end=end,
+                    duration=duration,
+                    interval=interval,
+                    location=location,
+                    session_type=sess,
+                ))
+            except Exception:
+                continue
 
-    logger.info("Web: schedule/save rules=%d", len(rules))
-    await sched_repo.save({"rules": rules})
+    logger.info("Web: schedule/save rules=%d", len(rule_models))
+    await sched_repo.save(rule_models)
     return RedirectResponse(url="/schedule?saved=1", status_code=302)
 
 

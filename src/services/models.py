@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -100,3 +100,85 @@ class Booking(BaseModel):
         populate_by_name = True
         str_strip_whitespace = True
         use_enum_values = True
+
+
+class ScheduleRule(BaseModel):
+    """Typed schedule rule stored in Firestore.
+    Document id is a deterministic composite key: f"{date}|{start}|{location}|{session_type}".
+    date uses dd-mm-yy, time uses HH:MM.
+    """
+    id: Optional[str] = None
+    date: str
+    start: str
+    end: str
+    duration: int = 50
+    interval: Optional[int] = None
+    location: Optional[str] = ""
+    session_type: Optional[str] = ""
+
+    @field_validator("date")
+    @classmethod
+    def _validate_date(cls, v: str) -> str:
+        s = str(v).strip()
+        try:
+            datetime.strptime(s, "%d-%m-%y")
+        except Exception:
+            raise ValueError("date must be in dd-mm-yy format")
+        return s
+
+    @staticmethod
+    def _valid_hhmm(s: str) -> bool:
+        try:
+            parts = str(s).split(":")
+            h = int(parts[0])
+            m = int(parts[1]) if len(parts) > 1 else 0
+            return 0 <= h <= 23 and 0 <= m <= 59
+        except Exception:
+            return False
+
+    @field_validator("start", "end")
+    @classmethod
+    def _validate_hhmm(cls, v: str) -> str:
+        s = str(v).strip()
+        if not cls._valid_hhmm(s):
+            raise ValueError("time must be in HH:MM format")
+        return s
+
+    @field_validator("duration", mode="before")
+    @classmethod
+    def _validate_duration(cls, v):
+        try:
+            return int(v)
+        except Exception:
+            return 50
+
+    @field_validator("interval", mode="before")
+    @classmethod
+    def _validate_interval(cls, v, info):
+        # if not provided, will be set to duration in model_validator
+        if v is None or str(v).strip() == "":
+            return None
+        try:
+            return int(v)
+        except Exception:
+            return None
+
+    @model_validator(mode="after")
+    def _post(self):
+        # Default interval to duration
+        if self.interval is None or int(self.interval) <= 0:
+            object.__setattr__(self, "interval", int(self.duration))
+        # Normalize strings
+        loc = (self.location or "").strip()
+        sess = (self.session_type or "").strip()
+        object.__setattr__(self, "location", loc)
+        object.__setattr__(self, "session_type", sess)
+        # Ensure id
+        if not self.id or not str(self.id).strip():
+            doc_id = f"{self.date}|{self.start}|{loc}|{sess}"
+            object.__setattr__(self, "id", doc_id)
+        return self
+
+    class Config:
+        populate_by_name = True
+        str_strip_whitespace = True

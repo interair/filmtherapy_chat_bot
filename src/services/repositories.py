@@ -16,7 +16,7 @@ except ImportError:
 
 from ..exceptions import ValidationError, NotFoundError
 
-from .models import Event, Booking, Location
+from .models import Event, Booking, Location, ScheduleRule
 from .storage import (
     DATA_DIR,
     QUIZ_PATH,
@@ -460,87 +460,125 @@ class AboutRepository:
 
 class ScheduleRepository:
     def __init__(self) -> None:
-        self._doc = get_client().collection("config").document("schedule")
+        # Use dedicated Firestore collection for schedule rules
+        self._col = get_client().collection("schedule")
+
+    # ---- Typed helpers ----------------------------------------------------
+    @staticmethod
+    def _normalize_rules(rules_in: List[ScheduleRule | Dict[str, Any]]) -> List[ScheduleRule]:
+        """Normalize incoming items (ScheduleRule or dict) into typed ScheduleRule models; invalid items are skipped."""
+        out: List[ScheduleRule] = []
+        for it in (rules_in or []):
+            try:
+                if isinstance(it, ScheduleRule):
+                    out.append(ScheduleRule.model_validate(it))
+                elif isinstance(it, dict):
+                    out.append(ScheduleRule.model_validate(it))
+            except Exception:
+                continue
+        return out
 
     @staticmethod
-    def _normalize_rules(rules_in: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Normalize schedule rules to date-based format.
-        Expected fields per rule:
-        - date: str in dd-mm-yy
-        - start: HH:MM
-        - end: HH:MM
-        - duration: int minutes (default 50)
-        - interval: int minutes (default = duration)
-        - location: str ("" means any; "online" means online-only)
-        - session_type: str ("" means any)
-        Invalid items are skipped.
+    def _doc_id_from_rule(rule: ScheduleRule | Dict[str, Any]) -> str:
+        """Build a deterministic document id to enforce uniqueness on
+        (date, location, session_type, start).
         """
-        from datetime import datetime as _dt
-        out_rules: List[Dict[str, Any]] = []
-        for it in rules_in or []:
-            if not isinstance(it, dict):
-                continue
-            date_str = str(it.get("date", "")).strip()
-            if not date_str:
-                continue
-            # Validate date format dd-mm-yy
-            try:
-                _dt.strptime(date_str, "%d-%m-%y")
-            except Exception:
-                continue
-            start = str(it.get("start", "")).strip()
-            end = str(it.get("end", "")).strip()
-            if not start or not end:
-                continue
-            try:
-                duration = int(it.get("duration", 50) or 50)
-            except Exception:
-                duration = 50
-            try:
-                interval = int(it.get("interval", duration) or duration)
-            except Exception:
-                interval = duration
-            location = str(it.get("location") or "").strip()
-            session_type = str(it.get("session_type") or "").strip()
-            out_rules.append({
-                "date": date_str,
-                "start": start,
-                "end": end,
-                "duration": duration,
-                "interval": interval,
-                "location": location,
-                "session_type": session_type,
-            })
-        return out_rules
+        if isinstance(rule, ScheduleRule):
+            return str(rule.id or f"{rule.date}|{rule.start}|{rule.location or ''}|{rule.session_type or ''}")
+        date = str(rule.get("date") or "").strip()
+        start = str(rule.get("start") or "").strip()
+        location = str(rule.get("location") or "").strip()
+        session_type = str(rule.get("session_type") or "").strip()
+        return f"{date}|{start}|{location}|{session_type}"
 
-    async def get(self) -> Dict[str, Any]:
-        snap = self._doc.get()
-        data = snap.to_dict() or {}
-        rules_in = data.get("rules") or []
-        return {"rules": self._normalize_rules(rules_in)}
+    @staticmethod
+    def _doc_to_rule(data: Dict[str, Any], doc_id: str) -> Optional[ScheduleRule]:
+        try:
+            # Ensure interval default and trimmed strings are handled by model
+            payload = {
+                "id": doc_id,
+                "date": str(data.get("date", "")).strip(),
+                "start": str(data.get("start", "")).strip(),
+                "end": str(data.get("end", "")).strip(),
+                "duration": data.get("duration", 50),
+                "interval": data.get("interval", None),
+                "location": data.get("location", ""),
+                "session_type": data.get("session_type", ""),
+            }
+            return ScheduleRule.model_validate(payload)
+        except Exception:
+            return None
 
-    async def save(self, payload: Dict[str, Any]) -> None:
-        if not isinstance(payload, dict):
-            payload = {}
-        out_rules = self._normalize_rules(payload.get("rules") or [])
-        self._doc.set({"rules": out_rules}, merge=False)
+    async def get(self) -> List[ScheduleRule]:
+        """Return all schedule rules as typed models."""
+        rules: List[ScheduleRule] = []
+        for doc in self._col.stream():
+            d = doc.to_dict() or {}
+            r = self._doc_to_rule(d, doc.id)
+            if r is not None:
+                rules.append(r)
+        rules.sort(key=lambda r: (r.date, r.start))
+        return rules
+
+    async def save(self, rules_in: List[ScheduleRule]) -> None:
+        new_rules = self._normalize_rules(rules_in)
+        # Deduplicate by composite key/doc id
+        unique: Dict[str, ScheduleRule] = {}
+        for r in new_rules:
+            unique[self._doc_id_from_rule(r)] = r
+        new_ids = set(unique.keys())
+        # Delete removed rules
+        existing_ids = [doc.id for doc in self._col.stream()]
+        for eid in existing_ids:
+            if eid not in new_ids:
+                self._col.document(eid).delete()
+        # Upsert new/updated rules
+        for doc_id, r in unique.items():
+            # Store full rule (exclude id to keep docs clean)
+            self._col.document(doc_id).set(r.model_dump(mode="python", exclude={"id"}), merge=False)
 
     # Synchronous helpers for non-async contexts
-    def get_sync(self) -> Dict[str, Any]:
-        snap = self._doc.get()
-        data = snap.to_dict() or {}
-        rules = data.get("rules")
-        if not isinstance(rules, list):
-            rules = []
-        return {"rules": rules}
+    def get_sync(self) -> List[ScheduleRule]:
+        rules: List[ScheduleRule] = []
+        for doc in self._col.stream():
+            d = doc.to_dict() or {}
+            r = self._doc_to_rule(d, doc.id)
+            if r is not None:
+                rules.append(r)
+        rules.sort(key=lambda r: (r.date, r.start))
+        return rules
 
-    def save_sync(self, payload: Dict[str, Any]) -> None:
-        if not isinstance(payload, dict):
-            payload = {}
-        rules = payload.get("rules")
-        if not isinstance(rules, list):
-            rules = []
-        self._doc.set({"rules": rules}, merge=False)
+    def save_sync(self, rules_in: List[ScheduleRule | Dict[str, Any]]) -> None:
+        new_rules = self._normalize_rules(rules_in)
+        unique: Dict[str, ScheduleRule] = {}
+        for r in new_rules:
+            unique[self._doc_id_from_rule(r)] = r
+        new_ids = set(unique.keys())
+        existing_ids = [doc.id for doc in self._col.stream()]
+        for eid in existing_ids:
+            if eid not in new_ids:
+                self._col.document(eid).delete()
+        for doc_id, r in unique.items():
+            self._col.document(doc_id).set(r.model_dump(mode="python", exclude={"id"}), merge=False)
+
+    # Optional typed API for future usage
+    async def get_all_rules(self) -> List[ScheduleRule]:
+        items: List[ScheduleRule] = []
+        for doc in self._col.stream():
+            r = self._doc_to_rule(doc.to_dict() or {}, doc.id)
+            if r:
+                items.append(r)
+        items.sort(key=lambda r: (r.date, r.start))
+        return items
+
+    def get_all_rules_sync(self) -> List[ScheduleRule]:
+        items: List[ScheduleRule] = []
+        for doc in self._col.stream():
+            r = self._doc_to_rule(doc.to_dict() or {}, doc.id)
+            if r:
+                items.append(r)
+        items.sort(key=lambda r: (r.date, r.start))
+        return items
 
 
 class BookingRepository(Repository[Booking]):
