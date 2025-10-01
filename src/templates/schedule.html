@@ -142,13 +142,24 @@
           const iso = toIso(hidden.value);
           if (iso) picker.value = iso;
         }
-        picker.addEventListener('change', () => {
-          hidden.value = toDdMmYy(picker.value);
-        });
+        const syncHidden = () => { hidden.value = toDdMmYy(picker.value); };
+        picker.addEventListener('change', syncHidden);
+        picker.addEventListener('input', syncHidden);
       });
     }
     document.addEventListener('DOMContentLoaded', () => {
       initDatePickers();
+      // Ensure dates are synced right before submit (in case change/input didn't fire)
+      const form = document.querySelector('form[action="/schedule/save"]');
+      if (form) {
+        form.addEventListener('submit', () => {
+          document.querySelectorAll('tr.rule-row').forEach(tr => {
+            const hidden = tr.querySelector('input.date-hidden');
+            const picker = tr.querySelector('input.date-picker');
+            if (hidden && picker) hidden.value = toDdMmYy(picker.value);
+          });
+        });
+      }
     });
     function addRule() {
       const tpl = document.getElementById('rowTemplate');
