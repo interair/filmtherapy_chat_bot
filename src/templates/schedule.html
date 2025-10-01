@@ -27,7 +27,8 @@
           <tr class="rule-row">
             <td>
               {% set date_val = r.date if r.date is not none else r['date'] %}
-              <input type="text" name="date" value="{{ date_val }}" placeholder="dd-mm-yy" pattern="\d{2}-\d{2}-\d{2}" required />
+              <input type="hidden" name="date" value="{{ date_val }}" class="date-hidden" />
+              <input type="date" class="date-picker" />
             </td>
             <td><input type="time" name="start" value="{{ r.start if r.start is not none else r['start'] }}" required /></td>
             <td><input type="time" name="end" value="{{ r.end if r.end is not none else r['end'] }}" required /></td>
@@ -77,7 +78,8 @@
   <template id="rowTemplate">
     <tr class="rule-row">
       <td>
-        <input type="text" name="date" value="" placeholder="dd-mm-yy" pattern="\d{2}-\d{2}-\d{2}" required />
+        <input type="hidden" name="date" value="" class="date-hidden" />
+        <input type="date" class="date-picker" />
       </td>
       <td><input type="time" name="start" value="10:00" required /></td>
       <td><input type="time" name="end" value="18:00" required /></td>
@@ -104,11 +106,48 @@
   </template>
 
   <script>
+    function toIso(dateStr) { // dd-mm-yy -> yyyy-mm-dd
+      if (!dateStr) return "";
+      const m = dateStr.match(/^(\d{2})-(\d{2})-(\d{2})$/);
+      if (!m) return "";
+      const d = m[1], mo = m[2], y2 = m[3];
+      const y4 = Number(y2) + 2000;
+      return `${y4}-${mo}-${d}`;
+    }
+    function toDdMmYy(iso) { // yyyy-mm-dd -> dd-mm-yy
+      if (!iso) return "";
+      const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m) return "";
+      const y2 = m[1].slice(-2);
+      return `${m[3]}-${m[2]}-${y2}`;
+    }
+    function initDatePickers(root) {
+      const rows = (root || document).querySelectorAll('tr.rule-row');
+      rows.forEach(tr => {
+        const hidden = tr.querySelector('input.date-hidden');
+        const picker = tr.querySelector('input.date-picker');
+        if (!hidden || !picker) return;
+        // Initialize picker value from hidden dd-mm-yy
+        if (hidden.value) {
+          const iso = toIso(hidden.value);
+          if (iso) picker.value = iso;
+        }
+        picker.addEventListener('change', () => {
+          hidden.value = toDdMmYy(picker.value);
+        });
+      });
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      initDatePickers();
+    });
     function addRule() {
       const tpl = document.getElementById('rowTemplate');
       const tbody = document.querySelector('#rulesTable tbody');
       const node = document.importNode(tpl.content, true);
       tbody.appendChild(node);
+      // Initialize datepicker on the newly added row
+      const lastRow = tbody.querySelector('tr.rule-row:last-child');
+      initDatePickers(lastRow);
     }
     function removeRow(btn) {
       const tr = btn.closest('tr');
