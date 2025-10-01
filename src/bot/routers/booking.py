@@ -624,7 +624,20 @@ async def my_bookings(message: Message) -> None:
     for it in unified:
         try:
             if it.get("_type") == "session":
-                text = f"{t(lang, 'book.my_title')}\n• {it.get('when_str')} — {it.get('location')} — {it.get('stype')}\n{it.get('status')}"
+                loc = it.get('location') or ''
+                when_str = it.get('when_str') or ''
+                stype = it.get('stype') or ''
+                # Icon by session type
+                stype_norm = str(stype).strip().lower()
+                if 'песоч' in stype_norm or 'sand' in stype_norm:
+                    icon = '🏖️'
+                elif 'онлайн' in stype_norm or 'online' in stype_norm:
+                    icon = '💻'
+                else:
+                    icon = '👥'
+                # New layout: first line icon + type, second line date — place; status removed
+                first_line = f"{icon} {stype}".strip()
+                text = f"{t(lang, 'book.my_title')}\n{first_line}\n• {when_str} — {loc}"
                 kbd = ik_kbd([[("❌ " + t(lang, "book.cancel_button"), f"cancel:{it.get('id')}")]])
             else:
                 # Cinema event
