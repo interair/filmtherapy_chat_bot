@@ -557,13 +557,6 @@ class ScheduleRepository:
         self._persist_rules(rules_in)
 
     # Optional typed API for future usage
-    async def get_all_rules(self) -> List[ScheduleRule]:
-        # Delegate to get() to keep behavior consistent
-        return await self.get()
-
-    def get_all_rules_sync(self) -> List[ScheduleRule]:
-        # Delegate to get_sync() to keep behavior consistent
-        return self.get_sync()
 
 
 class BookingRepository(Repository[Booking]):
