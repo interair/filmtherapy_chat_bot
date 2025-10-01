@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json as _json
 import os
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone, timedelta
 from functools import lru_cache
@@ -40,6 +41,32 @@ def _dumps_sorted_bytes(obj: Any) -> bytes:
 @lru_cache(maxsize=4096)
 def _validate_cached(model_cls: Type[BaseModel], payload: bytes) -> BaseModel:
     return model_cls.model_validate_json(payload)
+
+
+def _normalize_iso_datetime(val: Any) -> str:
+    """Normalize datetime values to ISO-8601 format with 'Z' suffix for UTC.
+    
+    Handles both datetime objects and string representations.
+    """
+    if isinstance(val, datetime):
+        dt = val.astimezone(timezone.utc).replace(microsecond=0)
+        return dt.isoformat().replace("+00:00", "Z")
+    # Normalize pre-existing strings: ensure 'T' separator and 'Z' for UTC
+    s = str(val)
+    if "T" not in s and " " in s:
+        s = s.replace(" ", "T")
+    if s.endswith("+00:00"):
+        s = s[:-6] + "Z"
+    return s
+
+
+def _normalize_dict_datetimes(data: dict, *field_names: str) -> dict:
+    """Normalize datetime fields in a dictionary to ISO-8601 format."""
+    for field in field_names:
+        value = data.get(field)
+        if value is not None:
+            data[field] = _normalize_iso_datetime(value)
+    return data
 
 
 class Repository(ABC, Generic[T]):
@@ -329,36 +356,39 @@ class UserLanguageRepository:
         self._col = get_client().collection("user_lang")
 
     def _is_cache_valid(self, key: str) -> bool:
-        import time
         if key not in self._cache_timestamps:
             return False
         return time.time() - self._cache_timestamps[key] < self._cache_ttl
+
+    def _update_cache(self, key: str, value: Optional[str]) -> None:
+        """Update cache with the given key and value."""
+        self._cache[key] = value
+        self._cache_timestamps[key] = time.time()
+
+    def _fetch_language(self, user_id: int) -> Optional[str]:
+        """Fetch language from Firestore for the given user_id."""
+        key = str(user_id)
+        snap = self._col.document(key).get()
+        
+        if not snap.exists:
+            self._update_cache(key, None)
+            return None
+        
+        data = snap.to_dict() or {}
+        val = data.get("lang")
+        result = val if isinstance(val, str) and val else None
+        self._update_cache(key, result)
+        return result
 
     async def get(self, user_id: int) -> Optional[str]:
         key = str(user_id)
         if key in self._cache and self._is_cache_valid(key):
             return self._cache[key]
-        
-        snap = self._col.document(key).get()
-        if not snap.exists:
-            import time
-            self._cache[key] = None
-            self._cache_timestamps[key] = time.time()
-            return None
-        
-        data = snap.to_dict() or {}
-        val = data.get("lang")
-        out = val if isinstance(val, str) and val else None
-        import time
-        self._cache[key] = out
-        self._cache_timestamps[key] = time.time()
-        return out
+        return self._fetch_language(user_id)
 
     async def set(self, user_id: int, lang: str) -> None:
         key = str(user_id)
-        import time
-        self._cache[key] = str(lang)
-        self._cache_timestamps[key] = time.time()
+        self._update_cache(key, str(lang))
         # Use merge=True to avoid overwriting other potential fields
         self._col.document(key).set({"lang": str(lang)}, merge=True)
 
@@ -366,27 +396,11 @@ class UserLanguageRepository:
         key = str(user_id)
         if key in self._cache and self._is_cache_valid(key):
             return self._cache[key]
-        
-        snap = self._col.document(key).get()
-        if not snap.exists:
-            import time
-            self._cache[key] = None
-            self._cache_timestamps[key] = time.time()
-            return None
-        
-        data = snap.to_dict() or {}
-        val = data.get("lang")
-        out = val if isinstance(val, str) and val else None
-        import time
-        self._cache[key] = out
-        self._cache_timestamps[key] = time.time()
-        return out
+        return self._fetch_language(user_id)
 
     def set_sync(self, user_id: int, lang: str) -> None:
         key = str(user_id)
-        import time
-        self._cache[key] = str(lang)
-        self._cache_timestamps[key] = time.time()
+        self._update_cache(key, str(lang))
         self._col.document(key).set({"lang": str(lang)}, merge=True)
 
 
@@ -394,9 +408,13 @@ class AboutRepository:
     def __init__(self) -> None:
         self._doc = get_client().collection("config").document("about")
 
-    async def get(self) -> Dict[str, Any]:
+    def _get_document_data(self) -> Dict[str, Any]:
+        """Fetch and return document data from Firestore."""
         snap = self._doc.get()
         return snap.to_dict() or {}
+
+    async def get(self) -> Dict[str, Any]:
+        return self._get_document_data()
 
     async def save(self, data: Dict[str, Any]) -> None:
         if not isinstance(data, dict):
@@ -409,8 +427,7 @@ class AboutRepository:
         return self.get_photo_file_path_sync()
 
     def get_photo_file_path_sync(self) -> Optional[str]:
-        snap = self._doc.get()
-        data = snap.to_dict() or {}
+        data = self._get_document_data()
         fn = data.get("photo") if isinstance(data, dict) else None
         if not isinstance(fn, str) or not fn:
             return None
@@ -424,8 +441,7 @@ class AboutRepository:
     # --- Film club (cinema) About photos management ---
     def list_cinema_photos(self) -> list[str]:
         """Return list of saved cinema (film club) photo filenames that exist on disk."""
-        snap = self._doc.get()
-        data = snap.to_dict() or {}
+        data = self._get_document_data()
         items = data.get("cinema_photos")
         if not isinstance(items, list):
             return []
@@ -439,8 +455,7 @@ class AboutRepository:
         return out
 
     async def add_cinema_photo(self, filename: str) -> None:
-        snap = self._doc.get()
-        data = snap.to_dict() or {}
+        data = self._get_document_data()
         items = data.get("cinema_photos")
         if not isinstance(items, list):
             items = []
@@ -449,8 +464,7 @@ class AboutRepository:
         self._doc.set({"cinema_photos": items}, merge=True)
 
     async def delete_cinema_photo(self, filename: str) -> None:
-        snap = self._doc.get()
-        data = snap.to_dict() or {}
+        data = self._get_document_data()
         items = data.get("cinema_photos")
         if not isinstance(items, list):
             items = []
@@ -482,9 +496,8 @@ class ScheduleRepository:
         """
         return str(rule.id or f"{rule.date}|{rule.start}|{rule.location or ''}|{rule.session_type or ''}")
 
-
-    async def get(self) -> List[ScheduleRule]:
-        """Return all schedule rules as typed models."""
+    def _fetch_rules(self) -> List[ScheduleRule]:
+        """Fetch all schedule rules from Firestore."""
         items: List[ScheduleRule] = []
         for doc in self._col.stream():
             data = doc.to_dict() or {}
@@ -500,7 +513,8 @@ class ScheduleRepository:
         items.sort(key=lambda r: (r.date, r.start))
         return items
 
-    async def save(self, rules_in: List[ScheduleRule]) -> None:
+    def _persist_rules(self, rules_in: List[ScheduleRule]) -> None:
+        """Persist schedule rules to Firestore."""
         new_rules = self._normalize_rules(rules_in)
         # Deduplicate by composite key/doc id
         unique: Dict[str, ScheduleRule] = {}
@@ -517,35 +531,19 @@ class ScheduleRepository:
             # Store full rule (exclude id to keep docs clean)
             self._col.document(doc_id).set(r.model_dump(mode="python", exclude={"id"}), merge=False)
 
+    async def get(self) -> List[ScheduleRule]:
+        """Return all schedule rules as typed models."""
+        return self._fetch_rules()
+
+    async def save(self, rules_in: List[ScheduleRule]) -> None:
+        self._persist_rules(rules_in)
+
     # Synchronous helpers for non-async contexts
     def get_sync(self) -> List[ScheduleRule]:
-        items: List[ScheduleRule] = []
-        for doc in self._col.stream():
-            data = doc.to_dict() or {}
-            data.setdefault("id", doc.id)
-            try:
-                payload = _dumps_sorted_bytes(data)
-                items.append(_validate_cached(ScheduleRule, payload))
-            except Exception:
-                try:
-                    items.append(ScheduleRule.model_validate(data))
-                except Exception:
-                    continue
-        items.sort(key=lambda r: (r.date, r.start))
-        return items
+        return self._fetch_rules()
 
     def save_sync(self, rules_in: List[ScheduleRule]) -> None:
-        new_rules = self._normalize_rules(rules_in)
-        unique: Dict[str, ScheduleRule] = {}
-        for r in new_rules:
-            unique[self._doc_id_from_rule(r)] = r
-        new_ids = set(unique.keys())
-        existing_ids = [doc.id for doc in self._col.stream()]
-        for eid in existing_ids:
-            if eid not in new_ids:
-                self._col.document(eid).delete()
-        for doc_id, r in unique.items():
-            self._col.document(doc_id).set(r.model_dump(mode="python", exclude={"id"}), merge=False)
+        self._persist_rules(rules_in)
 
     # Optional typed API for future usage
     async def get_all_rules(self) -> List[ScheduleRule]:
@@ -583,26 +581,12 @@ class BookingRepository(Repository[Booking]):
 
     # --- Synchronous helpers for non-async contexts (e.g., CalendarService) ---
     def get_all_sync(self) -> List[dict]:
-        def _iso(val: Any) -> str:
-            if isinstance(val, datetime):
-                dt = val.astimezone(timezone.utc).replace(microsecond=0)
-                return dt.isoformat().replace("+00:00", "Z")
-            # Normalize pre-existing strings: ensure 'T' separator and 'Z' for UTC when tzinfo missing
-            s = str(val)
-            if "T" not in s and " " in s:
-                s = s.replace(" ", "T")
-            if s.endswith("+00:00"):
-                s = s[:-6] + "Z"
-            return s
         items: List[dict] = []
         for doc in self._col.stream():
             d = doc.to_dict() or {}
             d.setdefault("id", doc.id)
             # Ensure strings for datetime fields in ISO-8601 with Z
-            for k in ("start", "end", "created_at"):
-                v = d.get(k)
-                if v is not None:
-                    d[k] = _iso(v)
+            _normalize_dict_datetimes(d, "start", "end", "created_at")
             items.append(d)
         return items
 
@@ -612,20 +596,7 @@ class BookingRepository(Repository[Booking]):
             return None
         d = snap.to_dict() or {}
         d.setdefault("id", snap.id)
-        def _iso(val: Any) -> str:
-            if isinstance(val, datetime):
-                dt = val.astimezone(timezone.utc).replace(microsecond=0)
-                return dt.isoformat().replace("+00:00", "Z")
-            s = str(val)
-            if "T" not in s and " " in s:
-                s = s.replace(" ", "T")
-            if s.endswith("+00:00"):
-                s = s[:-6] + "Z"
-            return s
-        for k in ("start", "end", "created_at"):
-            v = d.get(k)
-            if v is not None:
-                d[k] = _iso(v)
+        _normalize_dict_datetimes(d, "start", "end", "created_at")
         return d
 
     def set_sync(self, booking: dict) -> dict:
@@ -661,19 +632,8 @@ class BookingRepository(Repository[Booking]):
         start_of_day = date.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_day = start_of_day + timedelta(days=1)
         
-        def _iso(val: Any) -> str:
-            if isinstance(val, datetime):
-                dt = val.astimezone(timezone.utc).replace(microsecond=0)
-                return dt.isoformat().replace("+00:00", "Z")
-            s = str(val)
-            if "T" not in s and " " in s:
-                s = s.replace(" ", "T")
-            if s.endswith("+00:00"):
-                s = s[:-6] + "Z"
-            return s
-        
-        start_s = _iso(start_of_day)
-        end_s = _iso(end_of_day)
+        start_s = _normalize_iso_datetime(start_of_day)
+        end_s = _normalize_iso_datetime(end_of_day)
         items: List[dict] = []
         
         # Optimized query with limit to prevent excessive data retrieval
@@ -687,10 +647,7 @@ class BookingRepository(Repository[Booking]):
         for doc in query.stream():
             d = doc.to_dict() or {}
             d.setdefault("id", doc.id)
-            for k in ("start", "end", "created_at"):
-                v = d.get(k)
-                if v is not None:
-                    d[k] = _iso(v)
+            _normalize_dict_datetimes(d, "start", "end", "created_at")
             items.append(d)
         return items
 
@@ -701,19 +658,8 @@ class BookingRepository(Repository[Booking]):
         if end.tzinfo is None:
             end = end.replace(tzinfo=timezone.utc)
             
-        def _iso(val: Any) -> str:
-            if isinstance(val, datetime):
-                dt = val.astimezone(timezone.utc).replace(microsecond=0)
-                return dt.isoformat().replace("+00:00", "Z")
-            s = str(val)
-            if "T" not in s and " " in s:
-                s = s.replace(" ", "T")
-            if s.endswith("+00:00"):
-                s = s[:-6] + "Z"
-            return s
-            
-        start_s = _iso(start)
-        end_s = _iso(end)
+        start_s = _normalize_iso_datetime(start)
+        end_s = _normalize_iso_datetime(end)
         items: List[dict] = []
         
         # Calculate reasonable limit based on time range
@@ -731,28 +677,13 @@ class BookingRepository(Repository[Booking]):
         for doc in query.stream():
             d = doc.to_dict() or {}
             d.setdefault("id", doc.id)
-            for k in ("start", "end", "created_at"):
-                v = d.get(k)
-                if v is not None:
-                    d[k] = _iso(v)
+            _normalize_dict_datetimes(d, "start", "end", "created_at")
             items.append(d)
         return items
 
     def get_by_user_sync(self, user_id: int | str) -> List[dict]:
         """Return bookings for the given user_id using equality filter."""
         uid = str(user_id)
-        
-        def _iso(val: Any) -> str:
-            if isinstance(val, datetime):
-                dt = val.astimezone(timezone.utc).replace(microsecond=0)
-                return dt.isoformat().replace("+00:00", "Z")
-            s = str(val)
-            if "T" not in s and " " in s:
-                s = s.replace(" ", "T")
-            if s.endswith("+00:00"):
-                s = s[:-6] + "Z"
-            return s
-            
         items: List[dict] = []
         
         # Optimized query with limit for user bookings
@@ -765,10 +696,7 @@ class BookingRepository(Repository[Booking]):
         for doc in query.stream():
             d = doc.to_dict() or {}
             d.setdefault("id", doc.id)
-            for k in ("start", "end", "created_at"):
-                v = d.get(k)
-                if v is not None:
-                    d[k] = _iso(v)
+            _normalize_dict_datetimes(d, "start", "end", "created_at")
             items.append(d)
         return items
 
