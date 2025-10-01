@@ -8,6 +8,7 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.exceptions import TelegramAPIError
 
 from ..booking_flow import BookingData
 from ..callbacks import encode_stype, encode_loc, decode_stype, decode_loc
@@ -129,8 +130,8 @@ def _build_gcal_link_from_booking(booking: dict, lang: str | None) -> str | None
 async def safe_cb_answer(cb: CallbackQuery, text: str | None = None, show_alert: bool = False) -> None:
     try:
         await cb.answer(text=text, show_alert=show_alert)
-    except Exception:
-        logger.debug("safe_cb_answer failed", exc_info=True)
+    except TelegramAPIError as e:
+        logger.debug("safe_cb_answer failed data=%r: %s", getattr(cb, "data", None), e, exc_info=True)
 
 async def send_or_edit(event: Message | CallbackQuery, text: str, reply_markup=None) -> None:
     # Prefer editing for callbacks; fall back to sending a new message
@@ -374,8 +375,8 @@ async def show_times(cb: CallbackQuery, state: FSMContext):
     if not date or not stype:
         try:
             await cb.message.answer(t(lang, "book.no_slots"))
-        except Exception:
-            pass
+        except TelegramAPIError as e:
+            logger.debug("show_times: message.answer failed %s", e, exc_info=True)
         with contextlib.suppress(Exception):
             await cb.answer()
         return
