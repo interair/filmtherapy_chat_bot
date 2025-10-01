@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode, quote_plus
+import logging
 
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
@@ -14,6 +15,8 @@ from ...container import container
 from ...i18n.texts import t
 from ...services.storage import DATA_DIR
 from ...keyboards import cinema_menu
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -29,7 +32,8 @@ def _format_event_poster_text(item, lang: str) -> str:
     # When formatting
     try:
         when_str = item.when.strftime("%Y-%m-%d %H:%M")
-    except Exception:
+    except Exception as e1:
+        logger.debug("Failed to format ISO datetime: %s", e1)
         when_str = str(getattr(item, "when", ""))
 
     # Price formatting (fallback to i18n "free")

@@ -527,6 +527,23 @@ async def my_bookings(message: Message) -> None:
     if not uid:
         return
 
+    # Helpers to keep code compact and consistent
+    def _fmt_iso_ddmmyy_hhmm(s: str) -> tuple[str, float]:
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            return dt.strftime("%d-%m-%y %H:%M"), dt.timestamp()
+        except Exception as e1:
+            logger.debug("Failed to format ISO datetime: %s", e1)
+            return str(s), 0.0
+
+    def _icon_for(stype: str) -> str:
+        s = str(stype).strip().lower()
+        if "песоч" in s or "sand" in s:
+            return "🏖️"
+        if "онлайн" in s or "online" in s:
+            return "💻"
+        return "👥"
+
     # Collect session bookings (consultations)
     session_items = []
     try:
@@ -535,10 +552,30 @@ async def my_bookings(message: Message) -> None:
         logger.error("Failed to fetch user bookings for user_id=%s: %s", uid, e, exc_info=True)
         session_items = []
 
-    # Collect cinema registrations
+    unified: list[dict] = []
+
+    # Transform session bookings into unified items
+    for b in session_items:
+        try:
+            start_iso = b.get("start")
+            when_str, ts = ("", 0.0)
+            if isinstance(start_iso, str) and "T" in start_iso:
+                when_str, ts = _fmt_iso_ddmmyy_hhmm(start_iso)
+            unified.append({
+                "_type": "session",
+                "id": b.get("id"),
+                "when_str": when_str,
+                "ts": ts,
+                "location": b.get("location") or "Online",
+                "stype": b.get("session_type") or "Session",
+            })
+        except Exception as e:
+            logger.warning("Failed to parse booking item: %s, error: %s", b, e)
+            continue
+
+    # Collect cinema registrations and map to unified items
     event_repo = container.event_repository()
     reg_repo = container.event_registration_repository()
-    cinema_items = []
     try:
         regs = await reg_repo.list_by_user(uid)
         for r in regs:
@@ -549,23 +586,21 @@ async def my_bookings(message: Message) -> None:
                 ev = await event_repo.get_by_id(ev_id)
             except Exception as e:
                 logger.warning("Failed to fetch event id=%s for user=%s: %s", ev_id, uid, e)
-                ev = None
+                continue
             if not ev:
                 continue
-            # Prepare a pseudo-booking dict to unify rendering
             when_dt = getattr(ev, "when", None)
             when_str = ""
             ts_sort = 0.0
             if when_dt:
                 try:
-                    when_utc = when_dt
-                    when_str = when_utc.strftime("%Y-%m-%d %H:%M")
-                    ts_sort = when_utc.timestamp()
-                except (ValueError, TypeError, AttributeError) as e:
+                    when_str = when_dt.strftime("%d-%m-%y %H:%M")
+                    ts_sort = when_dt.timestamp()
+                except Exception as e:
                     logger.debug("Failed to format event datetime for event_id=%s: %s", ev_id, e)
                     when_str = str(when_dt)
                     ts_sort = 0.0
-            cinema_items.append({
+            unified.append({
                 "_type": "cinema",
                 "id": str(ev_id),
                 "when_str": when_str,
@@ -575,43 +610,6 @@ async def my_bookings(message: Message) -> None:
             })
     except Exception as e:
         logger.error("Failed to fetch cinema registrations for user_id=%s: %s", uid, e, exc_info=True)
-        cinema_items = []
-
-    # Transform session bookings into unified items
-    unified = []
-    for b in (session_items or []):
-        try:
-            start_iso = b.get("start")
-            when = ""
-            ts = 0.0
-            if isinstance(start_iso, str) and 'T' in start_iso:
-                date_s = start_iso.split('T', 1)[0]
-                time_s = start_iso.split('T', 1)[1][:5]
-                when = f"{date_s} {time_s}"
-                # Attempt to parse for sorting
-                try:
-                    ts = datetime.fromisoformat(start_iso.replace("Z", "+00:00")).timestamp()
-                except (ValueError, TypeError) as e:
-                    logger.debug("Failed to parse booking start time for sorting: %s", e)
-                    ts = 0.0
-            location = b.get("location") or "Online"
-            stype = b.get("session_type") or "Session"
-            status = b.get("status") or ""
-            unified.append({
-                "_type": "session",
-                "id": b.get("id"),
-                "when_str": when,
-                "ts": ts,
-                "location": location,
-                "stype": stype,
-                "status": status,
-            })
-        except Exception as e:
-            logger.warning("Failed to parse booking item: %s, error: %s", b, e)
-            continue
-
-    # Append cinema items
-    unified.extend(cinema_items)
 
     if not unified:
         await message.answer(t(lang, "book.my_none"))
@@ -624,27 +622,14 @@ async def my_bookings(message: Message) -> None:
     for it in unified:
         try:
             if it.get("_type") == "session":
-                loc = it.get('location') or ''
-                when_str = it.get('when_str') or ''
-                stype = it.get('stype') or ''
-                # Icon by session type
-                stype_norm = str(stype).strip().lower()
-                if 'песоч' in stype_norm or 'sand' in stype_norm:
-                    icon = '🏖️'
-                elif 'онлайн' in stype_norm or 'online' in stype_norm:
-                    icon = '💻'
-                else:
-                    icon = '👥'
-                # New layout: first line icon + type, second line date — place; status removed
-                first_line = f"{icon} {stype}".strip()
+                loc = it.get("location") or ""
+                when_str = it.get("when_str") or ""
+                stype = it.get("stype") or ""
+                first_line = f"{_icon_for(stype)} {stype}".strip()
                 text = f"{t(lang, 'book.my_title')}\n{first_line}\n• {when_str} — {loc}"
                 kbd = ik_kbd([[("❌ " + t(lang, "book.cancel_button"), f"cancel:{it.get('id')}")]])
             else:
-                # Cinema event
-                title = it.get("title") or ""
-                place = it.get("place") or ""
-                when_str = it.get("when_str") or ""
-                text = f"🎬 {title}\n• {when_str} — {place}"
+                text = f"🎬 {it.get('title', '')}\n• {it.get('when_str', '')} — {it.get('place', '')}"
                 kbd = ik_kbd([[('❌ ' + t(lang, 'book.cancel_button'), f"cancel_event:{it.get('id')}")]])
             await message.answer(text, reply_markup=kbd)
         except Exception:
