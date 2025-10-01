@@ -465,31 +465,22 @@ class ScheduleRepository:
 
     # ---- Typed helpers ----------------------------------------------------
     @staticmethod
-    def _normalize_rules(rules_in: List[ScheduleRule | Dict[str, Any]]) -> List[ScheduleRule]:
-        """Normalize incoming items (ScheduleRule or dict) into typed ScheduleRule models; invalid items are skipped."""
+    def _normalize_rules(rules_in: List[ScheduleRule]) -> List[ScheduleRule]:
+        """Normalize incoming ScheduleRule items into typed ScheduleRule models; invalid items are skipped."""
         out: List[ScheduleRule] = []
         for it in (rules_in or []):
             try:
-                if isinstance(it, ScheduleRule):
-                    out.append(ScheduleRule.model_validate(it))
-                elif isinstance(it, dict):
-                    out.append(ScheduleRule.model_validate(it))
+                out.append(ScheduleRule.model_validate(it))
             except Exception:
                 continue
         return out
 
     @staticmethod
-    def _doc_id_from_rule(rule: ScheduleRule | Dict[str, Any]) -> str:
+    def _doc_id_from_rule(rule: ScheduleRule) -> str:
         """Build a deterministic document id to enforce uniqueness on
         (date, location, session_type, start).
         """
-        if isinstance(rule, ScheduleRule):
-            return str(rule.id or f"{rule.date}|{rule.start}|{rule.location or ''}|{rule.session_type or ''}")
-        date = str(rule.get("date") or "").strip()
-        start = str(rule.get("start") or "").strip()
-        location = str(rule.get("location") or "").strip()
-        session_type = str(rule.get("session_type") or "").strip()
-        return f"{date}|{start}|{location}|{session_type}"
+        return str(rule.id or f"{rule.date}|{rule.start}|{rule.location or ''}|{rule.session_type or ''}")
 
 
     async def get(self) -> List[ScheduleRule]:
@@ -543,7 +534,7 @@ class ScheduleRepository:
         items.sort(key=lambda r: (r.date, r.start))
         return items
 
-    def save_sync(self, rules_in: List[ScheduleRule | Dict[str, Any]]) -> None:
+    def save_sync(self, rules_in: List[ScheduleRule]) -> None:
         new_rules = self._normalize_rules(rules_in)
         unique: Dict[str, ScheduleRule] = {}
         for r in new_rules:
