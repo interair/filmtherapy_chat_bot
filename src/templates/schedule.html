@@ -83,8 +83,8 @@
       </td>
       <td><input type="time" name="start" value="10:00" required /></td>
       <td><input type="time" name="end" value="18:00" required /></td>
-      <td><input type="number" name="duration" min="15" step="5" value="50" /></td>
-      <td><input type="number" name="interval" min="15" step="5" value="60" /></td>
+      <td><input type="number" name="duration" min="15" step="5" value="60" /></td>
+      <td><input type="number" name="interval" min="15" step="5" value="30" /></td>
       <td>
         <select name="location">
           <option value="" selected>— Any —</option>
@@ -121,12 +121,22 @@
       const y2 = m[1].slice(-2);
       return `${m[3]}-${m[2]}-${y2}`;
     }
+    function todayIsoLocal() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
     function initDatePickers(root) {
+      const minDate = todayIsoLocal();
       const rows = (root || document).querySelectorAll('tr.rule-row');
       rows.forEach(tr => {
         const hidden = tr.querySelector('input.date-hidden');
         const picker = tr.querySelector('input.date-picker');
         if (!hidden || !picker) return;
+        // Disallow past dates
+        picker.min = minDate;
         // Initialize picker value from hidden dd-mm-yy
         if (hidden.value) {
           const iso = toIso(hidden.value);

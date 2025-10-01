@@ -645,6 +645,14 @@ async def web_schedule_save(
         location = str(locations[i]) if i < len(locations) else ""
         sess = str(session_types[i]) if i < len(session_types) else ""
         if date_str and start and end:
+            # Skip past dates (UTC)
+            try:
+                d = datetime.strptime(date_str, "%d-%m-%y").date()
+                if d < datetime.now(timezone.utc).date():
+                    continue
+            except Exception:
+                # Invalid date format; skip
+                continue
             rules.append({
                 "date": date_str,
                 "start": start,
