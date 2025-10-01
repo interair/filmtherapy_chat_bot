@@ -3,8 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
+import logging
 
 from ..services.calendar_service import Slot
+from ..services.models import ScheduleRule
+
+logger = logging.getLogger(__name__)
 
 
 def _next_dates(n: int = 30) -> list[str]:  # Increased from 7 to 30 days
@@ -85,7 +89,8 @@ class BookingFlow:
                     if date_key not in bookings_by_date:
                         bookings_by_date[date_key] = []
                     bookings_by_date[date_key].append(booking)
-            except Exception:
+            except Exception as e:
+                logger.exception("Error while grouping booking by date in get_available_dates", e)
                 continue
         
         # Get schedule rules (with caching)
@@ -102,21 +107,22 @@ class BookingFlow:
         
         return out_dates
 
-    async def _get_schedule_rules(self):
+    async def _get_schedule_rules(self) -> List[ScheduleRule]:
         """Cache schedule rules briefly to reduce Firestore reads (5 seconds TTL)."""
         now = datetime.utcnow()
-        if (self._schedule_cache is None or 
-            self._schedule_cache_time is None or 
-            (now - self._schedule_cache_time).total_seconds() > 5):  # 5 seconds cache
-            
-            rules_models = self.calendar._schedule_repo.get_sync()
-            self._schedule_cache = [r.model_dump(mode="python", exclude={"id"}) for r in (rules_models or [])]
+        if (
+            self._schedule_cache is None
+            or self._schedule_cache_time is None
+            or (now - self._schedule_cache_time).total_seconds() > 5
+        ):
+            # Return models, not dicts
+            rules_models: List[ScheduleRule] = self.calendar._schedule_repo.get_sync() or []
+            self._schedule_cache = list(rules_models)
             self._schedule_cache_time = now
-        
         return self._schedule_cache
 
     def _has_available_slots_optimized(self, date: datetime, location: Optional[str], 
-                                     session_type: str, schedule_rules: list, bookings: list) -> bool:
+                                     session_type: str, schedule_rules: List[ScheduleRule], bookings: list) -> bool:
         """Fast check for availability without building the full list, reusing CalendarService helpers."""
         norm_in = self.calendar.normalize_session_type(session_type)
         now_utc = datetime.now(timezone.utc)
@@ -131,13 +137,12 @@ class BookingFlow:
                     s_dt = self.calendar.ensure_utc(datetime.fromisoformat(s_s.replace("Z", "+00:00")))
                     e_dt = self.calendar.ensure_utc(datetime.fromisoformat(e_s.replace("Z", "+00:00")))
                     busy_intervals.append((s_dt, e_dt))
-            except Exception:
+            except Exception as e:
+                logger.exception("Failed to parse busy interval from booking in _has_available_slots_optimized", e)
                 continue
 
         sel_loc = str(location or "").strip()
         for rule in schedule_rules:
-            if not isinstance(rule, dict):
-                continue
             matched = self.calendar._match_rule(date, rule, sel_loc, norm_in)
             if not matched:
                 continue
