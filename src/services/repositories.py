@@ -464,15 +464,29 @@ class ScheduleRepository:
 
     @staticmethod
     def _normalize_rules(rules_in: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Normalize schedule rules to date-based format.
+        Expected fields per rule:
+        - date: str in dd-mm-yy
+        - start: HH:MM
+        - end: HH:MM
+        - duration: int minutes (default 50)
+        - interval: int minutes (default = duration)
+        - location: str ("" means any; "online" means online-only)
+        - session_type: str ("" means any)
+        Invalid items are skipped.
+        """
+        from datetime import datetime as _dt
         out_rules: List[Dict[str, Any]] = []
         for it in rules_in or []:
             if not isinstance(it, dict):
                 continue
-            try:
-                weekday = int(it.get("weekday"))
-            except Exception:
+            date_str = str(it.get("date", "")).strip()
+            if not date_str:
                 continue
-            if weekday < 0 or weekday > 6:
+            # Validate date format dd-mm-yy
+            try:
+                _dt.strptime(date_str, "%d-%m-%y")
+            except Exception:
                 continue
             start = str(it.get("start", "")).strip()
             end = str(it.get("end", "")).strip()
@@ -489,7 +503,7 @@ class ScheduleRepository:
             location = str(it.get("location") or "").strip()
             session_type = str(it.get("session_type") or "").strip()
             out_rules.append({
-                "weekday": weekday,
+                "date": date_str,
                 "start": start,
                 "end": end,
                 "duration": duration,

@@ -620,7 +620,7 @@ async def web_schedule_save(
             v = data.get(key)
             return [v] if v is not None else []
 
-    weekdays = _list("weekday")
+    dates = _list("date")
     starts = _list("start")
     ends = _list("end")
     durations = _list("duration")
@@ -628,13 +628,10 @@ async def web_schedule_save(
     locations = _list("location")
     session_types = _list("session_type")
 
-    n = max(len(weekdays), len(starts), len(ends), len(durations), len(intervals), len(locations), len(session_types))
+    n = max(len(dates), len(starts), len(ends), len(durations), len(intervals), len(locations), len(session_types))
     rules = []
     for i in range(n):
-        try:
-            wd = int((weekdays[i] if i < len(weekdays) else -1))
-        except (ValueError, TypeError):
-            wd = -1
+        date_str = str(dates[i]).strip() if i < len(dates) else ""
         start = str(starts[i]) if i < len(starts) else ""
         end = str(ends[i]) if i < len(ends) else ""
         try:
@@ -647,9 +644,9 @@ async def web_schedule_save(
             interval = duration
         location = str(locations[i]) if i < len(locations) else ""
         sess = str(session_types[i]) if i < len(session_types) else ""
-        if 0 <= wd <= 6 and start and end:
+        if date_str and start and end:
             rules.append({
-                "weekday": wd,
+                "date": date_str,
                 "start": start,
                 "end": end,
                 "duration": duration,

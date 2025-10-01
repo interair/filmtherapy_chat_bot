@@ -8,6 +8,7 @@ from ..services.calendar_service import Slot
 
 
 def _next_dates(n: int = 30) -> list[str]:  # Increased from 7 to 30 days
+    """Return next n dates in ISO format (YYYY-MM-DD) for internal use."""
     today = datetime.utcnow().date()
     return [(today + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(n)]
 
@@ -16,7 +17,7 @@ def _next_dates(n: int = 30) -> list[str]:  # Increased from 7 to 30 days
 class BookingData:
     session_type: Optional[str] = None
     location: Optional[str] = None
-    date: Optional[str] = None  # YYYY-MM-DD
+    date: Optional[str] = None  # dd-mm-yy (user-facing)
     time: Optional[datetime] = None
 
 
@@ -59,19 +60,21 @@ class BookingFlow:
         return booking
 
     async def get_available_dates(self, session_type: str, location: Optional[str]) -> list[str]:
-        """Optimized version — fetch all data with a single query"""
-        date_range = _next_dates(30)  # 30 days instead of 7
-        if not date_range:
+        """Fetch available dates within next 30 days.
+        Returns dates formatted as dd-mm-yy for user display, while using ISO dates internally.
+        """
+        iso_dates = _next_dates(30)
+        if not iso_dates:
             return []
         
         # Compute date range for a single query
-        start_date = datetime.strptime(date_range[0], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        end_date = datetime.strptime(date_range[-1], "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+        start_date = datetime.strptime(iso_dates[0], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        end_date = datetime.strptime(iso_dates[-1], "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
         
         # Fetch all bookings for the period in a single query
         all_bookings = self.calendar._bookings_repo.get_range_sync(start_date, end_date)
         
-        # Group bookings by date
+        # Group bookings by date (ISO keys)
         bookings_by_date = {}
         for booking in all_bookings:
             try:
@@ -89,16 +92,15 @@ class BookingFlow:
         schedule_rules = await self._get_schedule_rules()
         
         # Check each date for available slots
-        dates: list[str] = []
-        for d in date_range:
-            dt = datetime.strptime(d, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            
+        out_dates: list[str] = []
+        for iso in iso_dates:
+            dt = datetime.strptime(iso, "%Y-%m-%d").replace(tzinfo=timezone.utc)
             if self._has_available_slots_optimized(
-                dt, location, session_type, schedule_rules, bookings_by_date.get(d, [])
+                dt, location, session_type, schedule_rules, bookings_by_date.get(iso, [])
             ):
-                dates.append(d)
+                out_dates.append(dt.strftime("%d-%m-%y"))
         
-        return dates
+        return out_dates
 
     async def _get_schedule_rules(self):
         """Cache schedule rules briefly to reduce Firestore reads (5 seconds TTL)."""
@@ -148,6 +150,8 @@ class BookingFlow:
         return False  # No free slots found
 
     async def get_available_times(self, date_str: str, session_type: str, location: Optional[str]) -> List[Slot]:
-        # This method remains unchanged as it is already optimized
-        date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        """Return available time slots for a specific date.
+        Expects date_str in dd-mm-yy format from the user interface.
+        """
+        date = datetime.strptime(date_str, "%d-%m-%y").replace(tzinfo=timezone.utc)
         return self.calendar.list_available_slots(date=date, location=location, session_type=session_type)

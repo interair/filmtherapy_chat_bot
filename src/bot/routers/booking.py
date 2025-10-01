@@ -338,7 +338,7 @@ async def noop(cb: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("date:"))
 async def choose_date(cb: CallbackQuery, state: FSMContext) -> None:
-    # Expected format: date:<stype_code>:<loc_code>:<YYYY-MM-DD>
+    # Expected format: date:<stype_code>:<loc_code>:<dd-mm-yy>
     parts = (cb.data or "").split(":")
     if len(parts) < 4:
         with contextlib.suppress(Exception):

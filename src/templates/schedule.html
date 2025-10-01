@@ -7,12 +7,12 @@
 
   <div class="card">
     <form method="post" action="/schedule/save">
-      <p class="muted">Define recurrent availability. The bot will offer slots based on these rules and existing bookings.</p>
+      <p class="muted">Define availability for specific dates (dd-mm-yy). The bot will offer slots based on these rules and existing bookings.</p>
 
       <table id="rulesTable">
         <thead>
           <tr>
-            <th style="width: 140px;">Weekday</th>
+            <th style="width: 140px;">Date (dd-mm-yy)</th>
             <th style="width: 110px;">Start</th>
             <th style="width: 110px;">End</th>
             <th style="width: 110px;">Duration</th>
@@ -26,12 +26,8 @@
         {% for r in rules %}
           <tr class="rule-row">
             <td>
-              <select name="weekday">
-                {% set wd = r.weekday if r.weekday is not none else r['weekday'] %}
-                {% for i,name in [(0,'Mon'),(1,'Tue'),(2,'Wed'),(3,'Thu'),(4,'Fri'),(5,'Sat'),(6,'Sun')] %}
-                  <option value="{{ i }}" {% if i == wd %}selected{% endif %}>{{ name }}</option>
-                {% endfor %}
-              </select>
+              {% set date_val = r.date if r.date is not none else r['date'] %}
+              <input type="text" name="date" value="{{ date_val }}" placeholder="dd-mm-yy" pattern="\d{2}-\d{2}-\d{2}" required />
             </td>
             <td><input type="time" name="start" value="{{ r.start if r.start is not none else r['start'] }}" required /></td>
             <td><input type="time" name="end" value="{{ r.end if r.end is not none else r['end'] }}" required /></td>
@@ -81,15 +77,7 @@
   <template id="rowTemplate">
     <tr class="rule-row">
       <td>
-        <select name="weekday">
-          <option value="0">Mon</option>
-          <option value="1">Tue</option>
-          <option value="2">Wed</option>
-          <option value="3">Thu</option>
-          <option value="4">Fri</option>
-          <option value="5">Sat</option>
-          <option value="6">Sun</option>
-        </select>
+        <input type="text" name="date" value="" placeholder="dd-mm-yy" pattern="\d{2}-\d{2}-\d{2}" required />
       </td>
       <td><input type="time" name="start" value="10:00" required /></td>
       <td><input type="time" name="end" value="18:00" required /></td>

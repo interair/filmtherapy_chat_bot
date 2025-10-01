@@ -126,10 +126,14 @@ class CalendarService:
     # --- Matching helpers (to keep logic in one place) -----------------------
     def _match_rule(self, date: datetime, rule: dict, sel_loc: str, norm_in: str) -> Optional[tuple[datetime, datetime, int, int, str]]:
         """Return (window_start, window_end, duration_min, interval_min, r_loc_norm) if the rule applies, else None.
-        Simplifies matching by handling weekday, location, type, and time window.
+        Simplifies matching by handling date (dd-mm-yy), location, type, and time window.
         """
         try:
-            if int(rule.get("weekday", -1)) != date.weekday():
+            rule_date = str(rule.get("date") or "").strip()
+            if not rule_date:
+                return None
+            # Compare against provided date in dd-mm-yy format
+            if rule_date != date.strftime("%d-%m-%y"):
                 return None
         except Exception:
             return None
