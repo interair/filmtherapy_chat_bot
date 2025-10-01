@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 
 from .repositories import BookingRepository, ScheduleRepository
 from ..exceptions import ValidationError
+from .models import ScheduleRule
 
 logger = logging.getLogger(__name__)
 
@@ -124,12 +125,12 @@ class CalendarService:
         return busy
 
     # --- Matching helpers (to keep logic in one place) -----------------------
-    def _match_rule(self, date: datetime, rule: dict, sel_loc: str, norm_in: str) -> Optional[tuple[datetime, datetime, int, int, str]]:
+    def _match_rule(self, date: datetime, rule: ScheduleRule, sel_loc: str, norm_in: str) -> Optional[tuple[datetime, datetime, int, int, str]]:
         """Return (window_start, window_end, duration_min, interval_min, r_loc_norm) if the rule applies, else None.
         Simplifies matching by handling date (dd-mm-yy), location, type, and time window.
         """
         try:
-            rule_date = str(rule.get("date") or "").strip()
+            rule_date = str(rule.date).strip()
             if not rule_date:
                 return None
             # Compare against provided date in dd-mm-yy format
@@ -138,7 +139,7 @@ class CalendarService:
         except Exception:
             return None
 
-        r_loc_norm = self.normalize_location_rule(str(rule.get("location") or "").strip())
+        r_loc_norm = self.normalize_location_rule(str(rule.location).strip() if rule.location is not None else "")
         is_online_session = norm_in == "online"
         if r_loc_norm == "online":
             if not is_online_session:
@@ -148,7 +149,7 @@ class CalendarService:
             if not is_online_session and sel_loc and sel_loc != r_loc_norm:
                 return None
 
-        r_sess = str(rule.get("session_type") or "").strip()
+        r_sess = str(rule.session_type or "").strip()
         if r_sess:
             norm_rule_raw = self.normalize_session_type(r_sess)
             if norm_rule_raw == "rest":
@@ -162,16 +163,16 @@ class CalendarService:
                 if norm_rule not in ("online", "offline") and norm_rule != norm_in:
                     return None
 
-        p_start = self.parse_hhmm(str(rule.get("start", "")).strip())
-        p_end = self.parse_hhmm(str(rule.get("end", "")).strip())
+        p_start = self.parse_hhmm(str(rule.start).strip())
+        p_end = self.parse_hhmm(str(rule.end).strip())
         if not p_start and not p_end:
             p_start, p_end = (0, 0), (23, 59)
         if not (p_start and p_end):
             return None
 
         try:
-            duration_min = int(rule.get("duration", 50) or 50)
-            interval_min = int(rule.get("interval", duration_min) or duration_min)
+            duration_min = int(rule.duration or 50)
+            interval_min = int((rule.interval if rule.interval is not None else rule.duration) or rule.duration or 50)
         except Exception:
             duration_min = 50
             interval_min = 50
@@ -200,8 +201,7 @@ class CalendarService:
         self, date: datetime, location: Optional[str], session_type: str
     ) -> List[Slot]:
         # Build slots from recurrent schedule rules (from Firestore), avoid full bookings reload
-        cfg = self._schedule_repo.get_sync()
-        rules = cfg.get("rules", []) if isinstance(cfg, dict) else []
+        rules: List[ScheduleRule] = self._schedule_repo.get_sync()
         
         # Ensure the input date is timezone-aware
         if date.tzinfo is None:
@@ -219,8 +219,6 @@ class CalendarService:
 
         sel_loc = str(location or "").strip()
         for r in rules:
-            if not isinstance(r, dict):
-                continue
             matched = self._match_rule(date, r, sel_loc, norm_in)
             if not matched:
                 continue

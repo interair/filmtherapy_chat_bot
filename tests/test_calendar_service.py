@@ -105,8 +105,12 @@ class FakeScheduleRepo:
         self.rules = rules or []
 
     def get_sync(self):
-        # CalendarService expects a dict with 'rules'
-        return {"rules": list(self.rules)}
+        # CalendarService now expects a typed list of ScheduleRule
+        from src.services.models import ScheduleRule
+        out: list[ScheduleRule] = []
+        for it in self.rules:
+            out.append(ScheduleRule.model_validate(it))
+        return out
 
 
 # ---------------------- Fixtures ----------------------
