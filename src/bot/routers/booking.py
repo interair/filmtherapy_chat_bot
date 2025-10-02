@@ -127,6 +127,25 @@ def _build_gcal_link_from_booking(booking: dict, lang: str | None) -> str | None
     }
     return "https://calendar.google.com/calendar/render?" + urlencode(params, quote_via=quote_plus)
 
+async def _send_gcal_button_for_booking(msg: Message, booking: dict | None, lang: str) -> None:
+    """Send a small follow-up message with a single 'Add to Google Calendar' button.
+    Safe no-op if link cannot be built.
+    """
+    try:
+        gcal_link = _build_gcal_link_from_booking(booking, lang)
+    except Exception:
+        logger.exception(
+            "Failed to build Google Calendar link from booking for follow-up button: booking_id=%s",
+            (booking.get('id') if isinstance(booking, dict) else None),
+        )
+        gcal_link = None
+    if gcal_link:
+        btn_label = "Add to Google Calendar"
+        kbd = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=btn_label, url=gcal_link)]])
+        followup_text = "📅"
+        with contextlib.suppress(Exception):
+            await msg.answer(followup_text, reply_markup=kbd)
+
 async def safe_cb_answer(cb: CallbackQuery, text: str | None = None, show_alert: bool = False) -> None:
     try:
         await cb.answer(text=text, show_alert=show_alert)
@@ -496,14 +515,8 @@ async def pay(cb: CallbackQuery) -> None:
         with contextlib.suppress(Exception):
             await cb.answer()
 
-        # Send a follow-up message with "Add to Google Calendar" button
-        gcal_link = _build_gcal_link_from_booking(booking, lang) if booking else None
-        if gcal_link:
-            btn_label = "Add to Google Calendar"
-            kbd = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=btn_label, url=gcal_link)]])
-            followup_text = "📅"
-            with contextlib.suppress(Exception):
-                await cb.message.answer(followup_text, reply_markup=kbd)
+        # Send a follow-up message with 'Add to Google Calendar' button
+        await _send_gcal_button_for_booking(cb.message, booking, lang)
     else:
         await cb.answer(t(lang, "book.pay_unavailable"), show_alert=True)
 
@@ -544,6 +557,14 @@ async def my_bookings(message: Message) -> None:
             return "💻"
         return "👥"
 
+    def _iso_z(dt: datetime) -> str:
+        try:
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        except Exception:
+            return str(dt)
+
     # Collect session bookings (consultations)
     session_items = []
     try:
@@ -558,16 +579,25 @@ async def my_bookings(message: Message) -> None:
     for b in session_items:
         try:
             start_iso = b.get("start")
+            end_iso = b.get("end")
             when_str, ts = ("", 0.0)
             if isinstance(start_iso, str) and "T" in start_iso:
                 when_str, ts = _fmt_iso_ddmmyy_hhmm(start_iso)
+            # Ensure end is present; default to +50 minutes from start
+            if not isinstance(end_iso, str) and isinstance(start_iso, str):
+                with contextlib.suppress(Exception):
+                    s_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+                    end_iso = _iso_z(s_dt + timedelta(minutes=50))
             unified.append({
-                "_type": "session",
                 "id": b.get("id"),
                 "when_str": when_str,
                 "ts": ts,
                 "location": b.get("location") or "Online",
-                "stype": b.get("session_type") or "Session",
+                # Fields for Google Calendar link builder
+                "session_type": b.get("session_type") or "Session",
+                "start": start_iso if isinstance(start_iso, str) else "",
+                "end": end_iso if isinstance(end_iso, str) else "",
+                "name": b.get("name"),
             })
         except Exception as e:
             logger.warning("Failed to parse booking item: %s, error: %s", b, e)
@@ -600,13 +630,23 @@ async def my_bookings(message: Message) -> None:
                     logger.debug("Failed to format event datetime for event_id=%s: %s", ev_id, e)
                     when_str = str(when_dt)
                     ts_sort = 0.0
+            # Prepare start/end for calendar link (3 hours duration for events)
+            start_iso_ev = ""
+            end_iso_ev = ""
+            if when_dt:
+                with contextlib.suppress(Exception):
+                    start_iso_ev = _iso_z(when_dt)
+                    end_iso_ev = _iso_z(when_dt + timedelta(hours=3))
             unified.append({
-                "_type": "cinema",
                 "id": str(ev_id),
                 "when_str": when_str,
                 "ts": ts_sort,
                 "title": getattr(ev, "title", ""),
-                "place": getattr(ev, "place", ""),
+                "location": getattr(ev, "place", "") or "",
+                # Fields to fit _build_gcal_link_from_booking
+                "session_type": getattr(ev, "title", "") or "Event",
+                "start": start_iso_ev,
+                "end": end_iso_ev,
             })
     except Exception as e:
         logger.error("Failed to fetch cinema registrations for user_id=%s: %s", uid, e, exc_info=True)
@@ -621,16 +661,32 @@ async def my_bookings(message: Message) -> None:
     # Render all
     for it in unified:
         try:
-            if it.get("_type") == "session":
+            is_session = (str(it.get("session_type") or "").strip() in SESSION_TYPES)
+            if is_session:
                 loc = it.get("location") or ""
                 when_str = it.get("when_str") or ""
-                stype = it.get("stype") or ""
+                stype = it.get("session_type") or ""
                 first_line = f"{_icon_for(stype)} {stype}".strip()
                 text = f"{t(lang, 'book.my_title')}\n{first_line}\n• {when_str} — {loc}"
-                kbd = ik_kbd([[("❌ " + t(lang, "book.cancel_button"), f"cancel:{it.get('id')}")]])
+                # Build keyboard: first 'Add to Google Calendar' (URL), then 'Cancel' (callback)
+                buttons_row = []
+                link = None
+                with contextlib.suppress(Exception):
+                    link = _build_gcal_link_from_booking(it, lang)
+                if link:
+                    buttons_row.append(InlineKeyboardButton(text="Add to Google Calendar", url=link))
+                buttons_row.append(InlineKeyboardButton(text=("❌ " + t(lang, "book.cancel_button")), callback_data=f"cancel:{it.get('id')}"))
+                kbd = InlineKeyboardMarkup(inline_keyboard=[buttons_row])
             else:
-                text = f"🎬 {it.get('title', '')}\n• {it.get('when_str', '')} — {it.get('place', '')}"
-                kbd = ik_kbd([[('❌ ' + t(lang, 'book.cancel_button'), f"cancel_event:{it.get('id')}")]])
+                text = f"🎬 {it.get('title', '')}\n• {it.get('when_str', '')} — {it.get('location', '')}"
+                buttons_row = []
+                link = None
+                with contextlib.suppress(Exception):
+                    link = _build_gcal_link_from_booking(it, lang)
+                if link:
+                    buttons_row.append(InlineKeyboardButton(text="Add to Google Calendar", url=link))
+                buttons_row.append(InlineKeyboardButton(text=('❌ ' + t(lang, 'book.cancel_button')), callback_data=f"cancel_event:{it.get('id')}"))
+                kbd = InlineKeyboardMarkup(inline_keyboard=[buttons_row])
             await message.answer(text, reply_markup=kbd)
         except Exception:
             continue
