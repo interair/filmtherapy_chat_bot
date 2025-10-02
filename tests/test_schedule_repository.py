@@ -85,9 +85,10 @@ async def test_save_and_get_roundtrip_sorted(fake_firestore):
     store_ids = set(col._store.keys())
     assert store_ids == {r1.id, r2.id}
 
-    # Ensure payloads do not include id
+    # Ensure payloads do not include id or deleted flag
     for doc_id, payload in col._store.items():
         assert "id" not in payload
+        assert "deleted" not in payload
         assert isinstance(payload.get("date"), str)
 
     # Read back and verify sorting by (date, start)
@@ -96,16 +97,21 @@ async def test_save_and_get_roundtrip_sorted(fake_firestore):
 
 
 @pytest.mark.asyncio
-async def test_save_deletes_removed_docs(fake_firestore):
+async def test_save_deletes_only_when_explicit(fake_firestore):
     repo = ScheduleRepository()
     r1 = make_rule("02-01-30", "10:00", "12:00")
     r2 = make_rule("02-01-30", "13:00", "15:00")
     await repo.save([r1, r2])
 
-    # Now keep only r2 and save
+    # Saving only a subset should NOT delete others anymore
     await repo.save([r2])
-
     col = fake_firestore.collection("schedule")
+    assert set(col._store.keys()) == {r1.id, r2.id}
+
+    # Now delete r1 explicitly using the deleted flag
+    r1_deleted = make_rule("02-01-30", "10:00", "12:00")
+    r1_deleted.deleted = True
+    await repo.save([r1_deleted])
     assert set(col._store.keys()) == {r2.id}
 
 
@@ -122,7 +128,7 @@ async def test_save_deduplicates_by_doc_id_last_wins(fake_firestore):
     col = fake_firestore.collection("schedule")
     assert set(col._store.keys()) == {a.id}
     # Last item should win
-    expected = b.model_dump(mode="python", exclude={"id"})
+    expected = b.model_dump(mode="python", exclude={"id", "deleted"})
     assert col._store[a.id] == expected
 
 

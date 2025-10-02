@@ -627,8 +627,10 @@ async def web_schedule_save(
     intervals = _list("interval")
     locations = _list("location")
     session_types = _list("session_type")
+    ids = _list("id")
+    deleted_flags = _list("deleted")
 
-    n = max(len(dates), len(starts), len(ends), len(durations), len(intervals), len(locations), len(session_types))
+    n = max(len(dates), len(starts), len(ends), len(durations), len(intervals), len(locations), len(session_types), len(ids), len(deleted_flags))
     # Build typed ScheduleRule objects directly
     rule_models: list[ScheduleRule] = []
     for i in range(n):
@@ -645,17 +647,22 @@ async def web_schedule_save(
             interval = duration
         location = str(locations[i]) if i < len(locations) else ""
         sess = str(session_types[i]) if i < len(session_types) else ""
+        id_val = (str(ids[i]) if i < len(ids) and ids[i] is not None else "").strip()
+        del_raw = (str(deleted_flags[i]).strip().lower() if i < len(deleted_flags) else "")
+        is_deleted = del_raw in ("1", "true", "yes", "on")
         if date_str and start and end:
-            # Skip past dates (UTC)
+            # Skip past dates only for non-deleted entries (UTC)
             try:
-                d = datetime.strptime(date_str, "%d-%m-%y").date()
-                if d < datetime.now(timezone.utc).date():
-                    continue
+                if not is_deleted:
+                    d = datetime.strptime(date_str, "%d-%m-%y").date()
+                    if d < datetime.now(timezone.utc).date():
+                        continue
             except Exception:
                 logger.warning("Skipping schedule line %d: invalid date format '%s' (expected dd-mm-yy)", i + 1, date_str)
                 continue
             try:
                 rule_models.append(ScheduleRule(
+                    id=(id_val or None),
                     date=date_str,
                     start=start,
                     end=end,
@@ -663,9 +670,10 @@ async def web_schedule_save(
                     interval=interval,
                     location=location,
                     session_type=sess,
+                    deleted=is_deleted,
                 ))
-            except Exception:
-                logger.error("Unexpected error processing schedule line %d '%s': %s", i + 1, line, e, exc_info=True)
+            except Exception as ex:
+                logger.exception("Unexpected error processing schedule line %d: %s", i + 1, ex)
                 continue
 
     logger.info("Web: schedule/save rules=%d", len(rule_models))

@@ -115,6 +115,7 @@ class ScheduleRule(BaseModel):
     interval: Optional[int] = None
     location: Optional[str] = ""
     session_type: Optional[str] = ""
+    deleted: bool = False
 
     @field_validator("date")
     @classmethod

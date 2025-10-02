@@ -525,22 +525,28 @@ class ScheduleRepository:
         return items
 
     def _persist_rules(self, rules_in: List[ScheduleRule]) -> None:
-        """Persist schedule rules to Firestore."""
+        """Persist schedule rules to Firestore.
+        New behavior: only explicitly delete rules that are marked with deleted=True.
+        All other incoming rules are upserted. Existing rules not present in the payload are preserved.
+        """
         new_rules = self._normalize_rules(rules_in)
-        # Deduplicate by composite key/doc id
-        unique: Dict[str, ScheduleRule] = {}
+        if not new_rules:
+            return
+        # Partition into deletes and upserts; last-wins deduplication by doc id
+        to_delete_ids: set[str] = set()
+        upserts: Dict[str, ScheduleRule] = {}
         for r in new_rules:
-            unique[self._doc_id_from_rule(r)] = r
-        new_ids = set(unique.keys())
-        # Delete removed rules
-        existing_ids = [doc.id for doc in self._col.stream()]
-        for eid in existing_ids:
-            if eid not in new_ids:
-                self._col.document(eid).delete()
-        # Upsert new/updated rules
-        for doc_id, r in unique.items():
-            # Store full rule (exclude id to keep docs clean)
-            self._col.document(doc_id).set(r.model_dump(mode="python", exclude={"id"}), merge=False)
+            doc_id = self._doc_id_from_rule(r)
+            if getattr(r, "deleted", False):
+                to_delete_ids.add(doc_id)
+            else:
+                upserts[doc_id] = r
+        # Perform deletions by explicit ids
+        for del_id in to_delete_ids:
+            self._col.document(del_id).delete()
+        # Upsert new/updated rules (exclude id and deleted from stored doc)
+        for doc_id, r in upserts.items():
+            self._col.document(doc_id).set(r.model_dump(mode="python", exclude={"id", "deleted"}), merge=False)
 
     async def get(self) -> List[ScheduleRule]:
         """Return all schedule rules as typed models."""

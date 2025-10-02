@@ -26,6 +26,8 @@
         {% for r in rules %}
           <tr class="rule-row">
             <td>
+              <input type="hidden" name="id" value="{{ r.id if r.id is not none else r['id'] }}" />
+              <input type="hidden" name="deleted" value="" class="deleted-flag" />
               {% set date_val = r.date if r.date is not none else r['date'] %}
               <input type="hidden" name="date" value="{{ date_val }}" class="date-hidden" />
               <input type="date" class="date-picker" />
@@ -78,6 +80,8 @@
   <template id="rowTemplate">
     <tr class="rule-row">
       <td>
+        <input type="hidden" name="id" value="" />
+        <input type="hidden" name="deleted" value="" class="deleted-flag" />
         <input type="hidden" name="date" value="" class="date-hidden" />
         <input type="date" class="date-picker" />
       </td>
@@ -172,7 +176,11 @@
     }
     function removeRow(btn) {
       const tr = btn.closest('tr');
-      if (tr) tr.remove();
+      if (!tr) return;
+      // Mark as deleted and hide, but keep inputs for submission
+      const flag = tr.querySelector('input.deleted-flag');
+      if (flag) flag.value = '1';
+      tr.style.display = 'none';
     }
   </script>
 {% endblock %}
