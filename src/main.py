@@ -84,4 +84,17 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    # Use a fork-safe start method for any multiprocessing needs.
+    # Forking with asyncio/aiogram can lead to subtle bugs (duplicated event loops, open sockets).
+    # 'spawn' ensures a clean interpreter state in child processes.
+    try:
+        import multiprocessing as _mp  # local import to avoid import-time side effects
+        # If not already set to 'spawn', enforce it before any child processes are created.
+        if getattr(_mp, "get_start_method", None):
+            cur = _mp.get_start_method(allow_none=True)
+            if cur != "spawn":
+                _mp.set_start_method("spawn", force=True)
+    except Exception as _e:  # best-effort only
+        logger.debug("Could not set multiprocessing start method to 'spawn': %s", _e)
+
     asyncio.run(main())
