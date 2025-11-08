@@ -133,19 +133,22 @@
       return `${yyyy}-${mm}-${dd}`;
     }
     function initDatePickers(root) {
-      const minDate = todayIsoLocal();
       const rows = (root || document).querySelectorAll('tr.rule-row');
       rows.forEach(tr => {
         const hidden = tr.querySelector('input.date-hidden');
         const picker = tr.querySelector('input.date-picker');
         if (!hidden || !picker) return;
-        // Disallow past dates
-        picker.min = minDate;
-        // Initialize picker value from hidden dd-mm-yy
+        // Initialize picker value from hidden dd-mm-yy FIRST
+        let currentIso = "";
         if (hidden.value) {
           const iso = toIso(hidden.value);
-          if (iso) picker.value = iso;
+          if (iso) {
+            picker.value = iso;
+            currentIso = iso;
+          }
         }
+        // Allow any date to be selected (no min constraint)
+        picker.removeAttribute('min');
         const syncHidden = () => { hidden.value = toDdMmYy(picker.value); };
         picker.addEventListener('change', syncHidden);
         picker.addEventListener('input', syncHidden);
@@ -177,9 +180,16 @@
     function removeRow(btn) {
       const tr = btn.closest('tr');
       if (!tr) return;
-      // Mark as deleted and hide, but keep inputs for submission
+      // Mark as deleted and hide
       const flag = tr.querySelector('input.deleted-flag');
       if (flag) flag.value = '1';
+      // Neutralize browser validation on hidden controls that are not submitted anyway
+      const picker = tr.querySelector('input.date-picker');
+      if (picker) {
+        picker.removeAttribute('min');
+        picker.disabled = true; // exclude from constraint validation and submission
+      }
+      // Keep hidden 'date', visible start/end/etc so backend can align lists and process deletion via id+deleted
       tr.style.display = 'none';
     }
   </script>
