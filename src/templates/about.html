@@ -11,16 +11,22 @@
     </div>
   </div>
 
-  {% if saved %}
+  {% if flags and flags.saved %}
     <div class="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-3 text-emerald-800 dark:text-emerald-200">
       <i data-lucide="check-circle" class="w-5 h-5"></i>
       <span class="font-medium">Saved</span>
     </div>
   {% endif %}
-  {% if deleted %}
+  {% if flags and flags.deleted %}
     <div class="mb-6 p-4 rounded-2xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 flex items-center gap-3 text-rose-800 dark:text-rose-200">
       <i data-lucide="trash-2" class="w-5 h-5"></i>
       <span class="font-medium">Deleted</span>
+    </div>
+  {% endif %}
+  {% if flags and flags.added %}
+    <div class="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-3 text-emerald-800 dark:text-emerald-200">
+      <i data-lucide="plus-circle" class="w-5 h-5"></i>
+      <span class="font-medium">Added new images</span>
     </div>
   {% endif %}
 
@@ -31,17 +37,41 @@
       <p class="text-sm text-slate-500 mb-4">Main text is edited in Translations (key: <code>about.text</code>). Here you can set a single photo shown in the bot.</p>
       
       <form method="post" action="/about/save" enctype="multipart/form-data" class="space-y-4">
-        <div class="flex justify-center px-6 pt-5 pb-6 border-2 border-slate-200 dark:border-slate-700 border-dashed rounded-2xl hover:border-primary-400 dark:hover:border-primary-500/50 transition-colors cursor-pointer group" onclick="document.getElementById('about-photo').click()">
-          <div class="space-y-1 text-center">
-            <i data-lucide="upload-cloud" class="mx-auto h-8 w-8 text-slate-400 group-hover:text-primary-500 transition-colors"></i>
-            <div class="text-xs text-slate-600 dark:text-slate-400">
-              <span class="font-medium text-primary-600 dark:text-primary-400">Choose file</span>
+        <div class="mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-slate-200 dark:border-slate-700 border-dashed rounded-2xl hover:border-primary-400 dark:hover:border-primary-500/50 transition-colors cursor-pointer group bg-slate-50/50 dark:bg-slate-900/20" onclick="document.getElementById('about-photo').click()">
+          <div class="space-y-2 text-center">
+            <div class="w-16 h-16 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300">
+              <i data-lucide="upload-cloud" class="h-8 w-8 text-primary-500"></i>
+            </div>
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                Click to upload <span class="text-slate-400">or drag and drop</span>
+              </p>
+              <p class="text-xs text-slate-500">Main about photo</p>
             </div>
           </div>
           <input type="file" id="about-photo" name="photo" accept="image/*" class="hidden" required>
         </div>
-        <button type="submit" class="btn btn-primary">
-          <i data-lucide="save" class="w-4 h-4"></i> Upload
+
+        <div id="about-photo-status" class="hidden p-3 rounded-xl bg-primary-50 dark:bg-primary-900/10 border border-primary-100 dark:border-primary-800/30 flex items-center justify-between">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600">
+              <i data-lucide="file-image" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <p id="about-file-name" class="text-sm font-medium text-slate-700 dark:text-slate-200 truncate"></p>
+              <p id="about-file-size" class="text-xs text-slate-500"></p>
+            </div>
+          </div>
+          <button type="button" id="clear-about-photo" class="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-rose-500 transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div id="about-photo-preview" class="hidden mt-4 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-inner">
+          <img src="" id="about-preview-img" class="w-full h-full object-cover">
+        </div>
+        <button type="submit" class="btn btn-primary w-full">
+          <i data-lucide="save" class="w-4 h-4"></i> Upload Photo
         </button>
       </form>
 
@@ -62,17 +92,43 @@
       <p class="text-sm text-slate-500 mb-4">Text is edited in Translations (key: <code>cinema.about_text</code>). Upload multiple images below; they will be sent after the text.</p>
 
       <form method="post" action="/about/cinema/add" enctype="multipart/form-data" class="space-y-4">
-        <div class="flex justify-center px-6 pt-5 pb-6 border-2 border-slate-200 dark:border-slate-700 border-dashed rounded-2xl hover:border-primary-400 dark:hover:border-primary-500/50 transition-colors cursor-pointer group" onclick="document.getElementById('cinema-photos').click()">
-          <div class="space-y-1 text-center">
-            <i data-lucide="upload" class="mx-auto h-8 w-8 text-slate-400 group-hover:text-primary-500 transition-colors"></i>
-            <div class="text-xs text-slate-600 dark:text-slate-400">
-              <span class="font-medium text-primary-600 dark:text-primary-400">Upload files</span>
+        <div class="mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-slate-200 dark:border-slate-700 border-dashed rounded-2xl hover:border-primary-400 dark:hover:border-primary-500/50 transition-colors cursor-pointer group bg-slate-50/50 dark:bg-slate-900/20" onclick="document.getElementById('cinema-photos').click()">
+          <div class="space-y-2 text-center">
+            <div class="w-16 h-16 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300">
+              <i data-lucide="upload" class="h-8 w-8 text-primary-500"></i>
+            </div>
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                Click to upload <span class="text-slate-400">or drag and drop</span>
+              </p>
+              <p class="text-xs text-slate-500">Multiple cinema photos</p>
             </div>
           </div>
           <input type="file" id="cinema-photos" name="photos" accept="image/*" class="hidden" multiple>
         </div>
-        <button type="submit" class="btn btn-primary">
-          <i data-lucide="save" class="w-4 h-4"></i> Upload
+
+        <div id="cinema-photos-status" class="hidden p-3 rounded-xl bg-primary-50 dark:bg-primary-900/10 border border-primary-100 dark:border-primary-800/30 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600">
+              <i data-lucide="images" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p id="cinema-file-count" class="text-sm font-medium text-slate-700 dark:text-slate-200"></p>
+              <p class="text-xs text-slate-500">Selected for upload</p>
+            </div>
+          </div>
+          <button type="button" id="clear-cinema-photos" class="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-rose-500 transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div id="cinema-photos-preview" class="hidden mt-4 space-y-4">
+          <div id="cinema-preview-container" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <!-- JS will populate this -->
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-full">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Cinema Photos
         </button>
       </form>
 
@@ -95,4 +151,88 @@
       {% endif %}
     </div>
   </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // About photo preview
+      const aboutPhotoInput = document.getElementById('about-photo');
+      const aboutPreview = document.getElementById('about-photo-preview');
+      const aboutPreviewImg = document.getElementById('about-preview-img');
+      const aboutStatus = document.getElementById('about-photo-status');
+      const aboutFileName = document.getElementById('about-file-name');
+      const aboutFileSize = document.getElementById('about-file-size');
+      const clearAboutBtn = document.getElementById('clear-about-photo');
+      
+      aboutPhotoInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+          aboutFileName.textContent = file.name;
+          aboutFileSize.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+          aboutStatus.classList.remove('hidden');
+          
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            aboutPreviewImg.src = e.target.result;
+            aboutPreview.classList.remove('hidden');
+          }
+          reader.readAsDataURL(file);
+        }
+      });
+
+      clearAboutBtn.addEventListener('click', function() {
+        aboutPhotoInput.value = '';
+        aboutStatus.classList.add('hidden');
+        aboutPreview.classList.add('hidden');
+      });
+
+      // Cinema photos preview
+      const cinemaPhotosInput = document.getElementById('cinema-photos');
+      const cinemaPreview = document.getElementById('cinema-photos-preview');
+      const cinemaContainer = document.getElementById('cinema-preview-container');
+      const cinemaStatus = document.getElementById('cinema-photos-status');
+      const cinemaFileCount = document.getElementById('cinema-file-count');
+      const clearCinemaBtn = document.getElementById('clear-cinema-photos');
+
+      cinemaPhotosInput.addEventListener('change', function() {
+        cinemaContainer.innerHTML = '';
+        if (this.files && this.files.length > 0) {
+          cinemaFileCount.textContent = this.files.length + ' images selected';
+          cinemaStatus.classList.remove('hidden');
+          cinemaPreview.classList.remove('hidden');
+          
+          Array.from(this.files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              const div = document.createElement('div');
+              div.className = 'rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm aspect-video';
+              div.innerHTML = `<img src="${e.target.result}" class="w-full h-full object-cover">`;
+              cinemaContainer.appendChild(div);
+            }
+            reader.readAsDataURL(file);
+          });
+        } else {
+          cinemaStatus.classList.add('hidden');
+          cinemaPreview.classList.add('hidden');
+        }
+      });
+
+      clearCinemaBtn.addEventListener('click', function() {
+        cinemaPhotosInput.value = '';
+        cinemaStatus.classList.add('hidden');
+        cinemaPreview.classList.add('hidden');
+      });
+
+      // Form submission feedback
+      document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function() {
+          const fileInput = form.querySelector('input[type="file"]');
+          if (fileInput && fileInput.files.length > 0) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Uploading...';
+            lucide.createIcons();
+          }
+        });
+      });
+    });
+  </script>
 {% endblock %}

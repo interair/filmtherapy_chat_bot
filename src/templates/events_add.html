@@ -79,20 +79,40 @@
               <i data-lucide="image" class="w-4 h-4 text-primary-500"></i>
               Cover Photo (Optional)
             </label>
-            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-200 dark:border-slate-700 border-dashed rounded-2xl hover:border-primary-400 dark:hover:border-primary-500/50 transition-colors cursor-pointer group" onclick="document.getElementById('photo').click()">
-              <div class="space-y-1 text-center">
-                <i data-lucide="upload-cloud" class="mx-auto h-12 w-12 text-slate-400 group-hover:text-primary-500 transition-colors"></i>
-                <div class="flex text-sm text-slate-600 dark:text-slate-400">
-                  <span class="relative font-medium text-primary-600 dark:text-primary-400">Upload a file</span>
-                  <p class="pl-1">or drag and drop</p>
+            <div class="mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-slate-200 dark:border-slate-700 border-dashed rounded-2xl hover:border-primary-400 dark:hover:border-primary-500/50 transition-colors cursor-pointer group bg-slate-50/50 dark:bg-slate-900/20" onclick="document.getElementById('photo').click()">
+              <div class="space-y-2 text-center">
+                <div class="w-16 h-16 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300">
+                  <i data-lucide="upload-cloud" class="h-8 w-8 text-primary-500"></i>
                 </div>
-                <p class="text-xs text-slate-500">
-                  PNG, JPG, WEBP up to 10MB
-                </p>
+                <div class="space-y-1">
+                  <p class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Click to upload <span class="text-slate-400">or drag and drop</span>
+                  </p>
+                  <p class="text-xs text-slate-500">
+                    PNG, JPG, WEBP up to 10MB
+                  </p>
+                </div>
               </div>
               <input type="file" id="photo" name="photo" accept="image/*" class="hidden">
             </div>
-            <div id="photo-preview" class="hidden mt-4 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-h-48">
+
+            <!-- Upload Status Widget -->
+            <div id="upload-status" class="hidden mt-4 p-3 rounded-xl bg-primary-50 dark:bg-primary-900/10 border border-primary-100 dark:border-primary-800/30 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600">
+                  <i data-lucide="file-image" class="w-5 h-5"></i>
+                </div>
+                <div class="min-w-0">
+                  <p id="file-name" class="text-sm font-medium text-slate-700 dark:text-slate-200 truncate max-w-[200px] md:max-w-[400px]"></p>
+                  <p id="file-size" class="text-xs text-slate-500"></p>
+                </div>
+              </div>
+              <button type="button" id="clear-file" class="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-rose-500 transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+              </button>
+            </div>
+
+            <div id="photo-preview" class="hidden mt-4 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-h-64 shadow-inner">
                 <img src="" id="preview-img" class="w-full h-full object-cover">
             </div>
           </div>
@@ -131,16 +151,41 @@
       const photoInput = document.getElementById('photo');
       const preview = document.getElementById('photo-preview');
       const previewImg = document.getElementById('preview-img');
+      const clearBtn = document.getElementById('clear-file');
+      const uploadStatus = document.getElementById('upload-status');
+      const fileName = document.getElementById('file-name');
+      const fileSize = document.getElementById('file-size');
       
       photoInput.addEventListener('change', function() {
         const file = this.files[0];
         if (file) {
+          fileName.textContent = file.name;
+          fileSize.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+          uploadStatus.classList.remove('hidden');
+          
           const reader = new FileReader();
           reader.onload = function(e) {
             previewImg.src = e.target.result;
             preview.classList.remove('hidden');
           }
           reader.readAsDataURL(file);
+        }
+      });
+
+      clearBtn.addEventListener('click', function() {
+        photoInput.value = '';
+        uploadStatus.classList.add('hidden');
+        preview.classList.add('hidden');
+      });
+
+      // Form submission feedback
+      const form = document.querySelector('form');
+      form.addEventListener('submit', function() {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (photoInput.files.length > 0) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Uploading...';
+          lucide.createIcons();
         }
       });
     });
