@@ -13,6 +13,7 @@ from aiogram.types import Message, CallbackQuery, FSInputFile, InputMediaPhoto, 
 
 from ..utils import user_lang, ik_kbd
 from ...container import container
+from ...services.event_service import EventService
 from ...i18n.texts import t
 from ...services.storage import DATA_DIR
 from ...keyboards import cinema_menu
@@ -161,7 +162,8 @@ async def film_club_menu(message: Message, state: FSMContext) -> None:
 async def film_club_schedule(message: Message) -> None:
     # Fetch user language and upcoming events in parallel
     lang_task = user_lang(message)
-    poster_task = container.event_repository().get_upcoming()
+    event_service: EventService = container.event_service()
+    poster_task = event_service.list_upcoming_events()
     lang, poster = await asyncio.gather(lang_task, poster_task)
     
     if not poster:
@@ -224,7 +226,8 @@ async def cb_cinema_about(cb: CallbackQuery) -> None:
 async def cb_cinema_schedule(cb: CallbackQuery) -> None:
     # Fetch user language and upcoming events in parallel
     lang_task = user_lang(cb)
-    poster_task = container.event_repository().get_upcoming()
+    event_service: EventService = container.event_service()
+    poster_task = event_service.list_upcoming_events()
     lang, poster = await asyncio.gather(lang_task, poster_task)
     
     if not poster:

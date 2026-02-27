@@ -65,4 +65,5 @@ class EventService:
 
     async def delete_event(self, event_id: str) -> bool:
         logger.info("EventService: delete_event id=%s", event_id)
+        # Clear cache for any upcoming list if we had one (though currently it's on-the-fly)
         return await self._repo.delete(event_id)

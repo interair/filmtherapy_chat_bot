@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, Request, UploadFile, File
 from fastapi.responses import RedirectResponse
 
 from ...services.repositories import LocationRepository, EventRepository
-from ..dependencies import verify_web_auth, get_location_service, get_event_registration_repository, get_event_repository
+from ...services.event_service import EventService
+from ..dependencies import verify_web_auth, get_location_service, get_event_registration_repository, get_event_repository, get_event_service
 from .common import render
 from .utils import save_upload
 
@@ -17,10 +18,10 @@ router = APIRouter(prefix="/events", tags=["events"], dependencies=[Depends(veri
 @router.get("")
 async def web_events(
     request: Request,
-    event_repo: EventRepository = Depends(get_event_repository),
+    event_service: EventService = Depends(get_event_service),
     reg_repo = Depends(get_event_registration_repository),
 ):
-    events = await event_repo.get_all()
+    events = await event_service.list_upcoming_events()
     attendees = {}
     for ev in events:
         regs = await reg_repo.get_by_event(ev.id)
@@ -105,6 +106,6 @@ async def web_events_save(
         return RedirectResponse(url="/events?error=1", status_code=303)
 
 @router.get("/delete/{id}")
-async def web_events_delete(id: str, event_repo: EventRepository = Depends(get_event_repository)):
-    await event_repo.delete(id)
+async def web_events_delete(id: str, event_service: EventService = Depends(get_event_service)):
+    await event_service.delete_event(id)
     return RedirectResponse(url="/events?deleted=1", status_code=303)

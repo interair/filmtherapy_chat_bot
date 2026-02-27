@@ -164,10 +164,13 @@ class FirestoreRepository(Repository[T]):
         return obj
 
     async def delete(self, item_id: str) -> bool:
-        ref = self._col.document(str(item_id).strip())
+        doc_id = str(item_id).strip()
+        ref = self._col.document(doc_id)
         if not (await ref.get()).exists:
+            logger.info("FirestoreRepository: delete id=%s not found in %s", doc_id, self._col.id)
             return False
         await ref.delete()
+        logger.info("FirestoreRepository: deleted id=%s from %s", doc_id, self._col.id)
         return True
 
 
@@ -182,9 +185,11 @@ class EventRepository(FirestoreRepository[Event]):
         query = self._col.where(filter=FieldFilter("when", ">=", now)).order_by("when").limit(100)
         async for doc in query.stream():
             try:
-                items.append(self._to_model(doc.id, doc.to_dict() or {}))
+                model = self._to_model(doc.id, doc.to_dict() or {})
+                items.append(model)
             except Exception as e:
                 logger.error("Failed to validate event doc_id=%s: %s", doc.id, e, exc_info=True)
+        logger.info("EventRepository: get_upcoming returning %d events", len(items))
         return items
 
 

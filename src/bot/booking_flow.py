@@ -91,8 +91,8 @@ class BookingFlow:
                     if date_key not in bookings_by_date:
                         bookings_by_date[date_key] = []
                     bookings_by_date[date_key].append(booking)
-            except Exception as e:
-                logger.exception("Error while grouping booking by date in get_available_dates", e)
+            except Exception:
+                logger.exception("Error while grouping booking by date in get_available_dates")
                 continue
         
         # Check each date for available slots
@@ -115,7 +115,7 @@ class BookingFlow:
             or (now - self._schedule_cache_time).total_seconds() > 5
         ):
             # Return models, not dicts
-            rules_models: List[ScheduleRule] = await self.calendar._schedule_repo.get() or []
+            rules_models: List[ScheduleRule] = await self.calendar._schedule_repo.get_all() or []
             self._schedule_cache = list(rules_models)
             self._schedule_cache_time = now
         return self._schedule_cache
@@ -136,8 +136,8 @@ class BookingFlow:
                     s_dt = self.calendar.ensure_utc(datetime.fromisoformat(s_s.replace("Z", "+00:00")))
                     e_dt = self.calendar.ensure_utc(datetime.fromisoformat(e_s.replace("Z", "+00:00")))
                     busy_intervals.append((s_dt, e_dt))
-            except Exception as e:
-                logger.exception("Failed to parse busy interval from booking in _has_available_slots_optimized", e)
+            except Exception:
+                logger.exception("Failed to parse busy interval from booking in _has_available_slots_optimized")
                 continue
 
         sel_loc = str(location or "").strip()
