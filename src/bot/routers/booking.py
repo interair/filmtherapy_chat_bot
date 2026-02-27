@@ -242,13 +242,11 @@ async def show_locations(cb: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data.startswith("loc:"), BookingStates.choosing_location)
+
 async def choose_location(cb: CallbackQuery, state: FSMContext) -> None:
     location = cb.data.split(":", 1)[1]
     await state.update_data(location=location)
     await show_dates(cb, state)
-
-
-PAGE_SIZE = 7
 
 
 def _build_dates_rows(dates: list[str], page: int, stype_code: str, loc_code: str) -> list[list[tuple[str, str]]]:
@@ -450,7 +448,7 @@ async def choose_time(cb: CallbackQuery, state: FSMContext) -> None:
     try:
         timestamp = float(ts_str)
         time_slot = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-    except ValueError, TypeError, OSError:
+    except (ValueError, TypeError, OSError):
         await cb.answer(t(lang, "error.invalid_datetime"), show_alert=True)
         return
 

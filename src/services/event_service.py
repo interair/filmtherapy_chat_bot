@@ -3,8 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 import sys
-from datetime import datetime
-from typing import List, Optional
+from typing import List
 
 from .models import Event, EventCreate
 from .repositories import EventRepository

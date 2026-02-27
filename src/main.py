@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -13,7 +12,6 @@ from .bot.routers import booking, cinema, quiz, admin
 from .bot.routers import start as start_router
 from .bot.webapp import start_web, mark_bot_running
 from .config import settings
-from .profiling import step, since_interpreter_start, PROFILE_STARTUP
 
 # Configure logging to stdout only (cloud-native friendly)
 logging.basicConfig(
@@ -38,13 +36,8 @@ def build_dispatcher() -> Dispatcher:
 
 
 async def main() -> None:
-    if PROFILE_STARTUP:
-        logger.info("Startup profiling enabled (APP_PROFILE_STARTUP=1)")
-        since_interpreter_start("enter main()", logger)
-    with step("Create Bot", logger):
-        bot = Bot(token=settings.telegram_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    with step("Build Dispatcher", logger):
-        dp = build_dispatcher()
+    bot = Bot(token=settings.telegram_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    dp = build_dispatcher()
 
     # Decide whether to start web server (admin UI and/or webhook endpoint)
     web_needed = bool(settings.use_webhook) or bool(settings.web_username and settings.web_password)
@@ -53,8 +46,7 @@ async def main() -> None:
     web_task = None
     if web_needed:
         # Pass bot and dp so webhook endpoint can process updates
-        with step("Start web server task", logger):
-            web_task = asyncio.create_task(start_web(bot, dp))
+        web_task = asyncio.create_task(start_web(bot, dp))
         logger.info("Starting web server on port %s (webhook=%s, admin_ui=%s)", settings.web_port, settings.use_webhook, bool(settings.web_username and settings.web_password))
     else:
         logger.info("Web server disabled (set USE_WEBHOOK=true or provide WEB_USERNAME/WEB_PASSWORD to enable)")
@@ -67,14 +59,12 @@ async def main() -> None:
             await asyncio.Event().wait()
         else:
             # Polling mode: ensure any existing webhook is removed to avoid conflicts
-            with step("Delete webhook before polling", logger):
-                try:
-                    await bot.delete_webhook(drop_pending_updates=True)
-                    logger.info("Ensured webhook is removed before polling")
-                except Exception as e:
-                    logger.warning("Failed to delete webhook before polling: %s", e)
-            with step("Start polling", logger):
-                await dp.start_polling(bot)
+            try:
+                await bot.delete_webhook(drop_pending_updates=True)
+                logger.info("Ensured webhook is removed before polling")
+            except Exception as e:
+                logger.warning("Failed to delete webhook before polling: %s", e)
+            await dp.start_polling(bot)
     finally:
         mark_bot_running(False)
         if web_task:

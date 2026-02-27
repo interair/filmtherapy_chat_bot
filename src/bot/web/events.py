@@ -6,9 +6,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Request, UploadFile
 from fastapi.responses import RedirectResponse
 
-from ...services.event_service import EventService
 from ...services.repositories import LocationRepository, EventRepository
-from ..dependencies import verify_web_auth, get_event_service, get_location_service, get_event_registration_repository, get_event_repository
+from ..dependencies import verify_web_auth, get_location_service, get_event_registration_repository, get_event_repository
 from .common import render
 from .utils import save_upload
 

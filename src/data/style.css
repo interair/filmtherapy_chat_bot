@@ -1,5 +1,0 @@
-.kv ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr; gap: 8px; }
-.kv li { display: grid; grid-template-columns: 240px 1fr; align-items: center; padding: 10px 12px; border: 1px dashed var(--panel-border); border-radius: 12px; background: rgba(255,255,255,0.4); }
-html[data-theme="dark"] .kv li { background: rgba(0,0,0,0.15); }
-.kv .k { font-weight: 600; color: var(--text-muted); }
-.kv .v { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }

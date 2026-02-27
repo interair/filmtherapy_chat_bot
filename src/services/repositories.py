@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from functools import lru_cache
 from typing import Generic, TypeVar, List, Optional, Dict, Any, Type
 
-from pydantic import BaseModel, ValidationError as PydanticValidationError
+from pydantic import BaseModel
 
 try:
     import orjson as _orjson
