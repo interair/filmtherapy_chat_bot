@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --user --no-cache-dir --prefer-binary -r requirements.txt
 
 # Stage 2: Final
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

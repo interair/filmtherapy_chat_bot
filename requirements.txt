@@ -9,7 +9,7 @@ Jinja2==3.1.6
 python-multipart==0.0.22
 dependency-injector==4.48.3
 google-cloud-firestore==2.23.0
-# Ensure a grpcio version with Python 3.13 wheels is selected.
+# Ensure a grpcio version with Python 3.14 wheels is selected.
 grpcio==1.78.0
 
 # Test dependencies
