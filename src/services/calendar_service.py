@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -203,21 +204,22 @@ class CalendarService:
         self, date: datetime, location: Optional[str], session_type: str
     ) -> List[Slot]:
         # Build slots from recurrent schedule rules (from Firestore), avoid full bookings reload
-        rules: List[ScheduleRule] = await self._schedule_repo.get()
-        
+        # Parallelize fetching rules and busy intervals
+        rules_task = self._schedule_repo.get()
+        busy_task = self._day_busy_intervals(date)
+
+        rules, busy_intervals = await asyncio.gather(rules_task, busy_task)
+
         # Ensure the input date is timezone-aware
         if date.tzinfo is None:
             date = date.replace(tzinfo=timezone.utc)
-        
+
         slots: List[Slot] = []
 
         # Normalize session type and determine online mode
         norm_in = self.normalize_session_type(session_type)
         is_online_session = norm_in == "online"
         now_utc = datetime.now(timezone.utc)
-
-        # Collect busy intervals for this date once
-        busy_intervals = await self._day_busy_intervals(date)
 
         sel_loc = str(location or "").strip()
         for r in rules:

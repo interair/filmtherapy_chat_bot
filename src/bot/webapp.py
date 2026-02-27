@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 import base64
 import os
@@ -338,10 +339,16 @@ async def web_index(request: Request, metrics = Depends(get_metrics_service), fl
     added = flags.added
     updated = flags.updated
     time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-    overview = await metrics.today_overview()
-    top_features = await metrics.feature_usage(days=7, top_n=3)
-    # Count bookings created today (UTC) for attention banner
-    new_bookings_today = await compute_new_bookings_today()
+    
+    # Parallelize metrics and bookings fetching
+    overview_task = metrics.today_overview()
+    top_features_task = metrics.feature_usage(days=7, top_n=3)
+    new_bookings_task = compute_new_bookings_today()
+    
+    overview, top_features, new_bookings_today = await asyncio.gather(
+        overview_task, top_features_task, new_bookings_task
+    )
+    
     return templates.TemplateResponse("index.html", {
         "request": request,
         "saved": saved,
@@ -402,17 +409,23 @@ async def web_events(
 ):
     events = await event_service.list_upcoming_events()
     attendees: dict[str, list[dict]] = {}
-    try:
-        for ev in events:
-            try:
-                regs = await reg_repo.get_by_event(ev.id)
-                attendees[ev.id] = regs if regs else []
-            except BotException as e:
-                logging.getLogger(__name__).error(f"Failed to get registrations for event {ev.id}: {e}")
-                attendees[ev.id] = []
-    except BotException as e:
-        logging.getLogger(__name__).error(f"Failed to load event attendees: {e}")
-        attendees = {}
+    
+    if events:
+        try:
+            # Parallelize registrations fetching for all events
+            results = await asyncio.gather(
+                *[reg_repo.get_by_event(ev.id) for ev in events],
+                return_exceptions=True
+            )
+            for ev, res in zip(events, results):
+                if isinstance(res, Exception):
+                    logging.getLogger(__name__).error(f"Failed to get registrations for event {ev.id}: {res}")
+                    attendees[ev.id] = []
+                else:
+                    attendees[ev.id] = res if res else []
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Failed to load event attendees: {e}")
+            attendees = {ev.id: [] for ev in events}
     
     return templates.TemplateResponse("events.html", {"request": request, "poster": events, "attendees": attendees})
 

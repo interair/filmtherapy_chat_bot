@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -19,8 +20,11 @@ class QuizStates(StatesGroup):
 
 @router.message(F.text.in_({"Что посмотреть?", "What to watch?", "🎥 Что посмотреть?", "🎥 What to watch?"}))
 async def quiz_start(message: Message, state: FSMContext) -> None:
-    lang = await user_lang(message)
-    cfg = await container.quiz_repository().get_config()
+    # Run user language fetch and quiz config fetch in parallel
+    lang_task = user_lang(message)
+    cfg_task = container.quiz_repository().get_config()
+    lang, cfg = await asyncio.gather(lang_task, cfg_task)
+    
     moods = [(m.get("title", ""), m.get("code", "")) for m in cfg.get("moods", [])]
     rows = [[(title, f"mood:{code}")] for title, code in moods if title and code]
     await state.set_state(QuizStates.choosing_mood)
@@ -29,11 +33,14 @@ async def quiz_start(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("mood:"))
 async def quiz_mood(cb: CallbackQuery, state: FSMContext) -> None:
-    lang = await user_lang(cb)
+    # Run user language fetch and quiz config fetch in parallel
+    lang_task = user_lang(cb)
+    cfg_task = container.quiz_repository().get_config()
+    lang, cfg = await asyncio.gather(lang_task, cfg_task)
+    
     code = cb.data.split(":", 1)[1]
     await state.update_data(mood=code)
     await state.set_state(QuizStates.choosing_company)
-    cfg = await container.quiz_repository().get_config()
     companies = [(c.get("title", ""), c.get("code", "")) for c in cfg.get("companies", [])]
     rows = [[(title, f"company:{code}:{cc}")] for title, cc in companies if title and cc]
     try:
@@ -45,9 +52,12 @@ async def quiz_mood(cb: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("company:"))
 async def quiz_company(cb: CallbackQuery, state: FSMContext) -> None:
-    lang = await user_lang(cb)
+    # Run user language fetch and quiz config fetch in parallel
+    lang_task = user_lang(cb)
+    cfg_task = container.quiz_repository().get_config()
+    lang, cfg = await asyncio.gather(lang_task, cfg_task)
+    
     _, mood_code, comp_code = cb.data.split(":", 2)
-    cfg = await container.quiz_repository().get_config()
     recs = cfg.get("recs", {})
     key = f"{mood_code}|{comp_code}"
     movies = recs.get(key) or ["Inception", "Amélie", "Interstellar"]

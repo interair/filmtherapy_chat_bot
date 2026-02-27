@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
@@ -158,8 +159,11 @@ async def film_club_menu(message: Message, state: FSMContext) -> None:
 # Schedule button -> previous behavior
 @router.message(F.text.in_({"Расписание", "🗓️ Расписание", "Schedule", "🗓️ Schedule"}))
 async def film_club_schedule(message: Message) -> None:
-    lang = await user_lang(message)
-    poster = await container.event_repository().get_upcoming()
+    # Fetch user language and upcoming events in parallel
+    lang_task = user_lang(message)
+    poster_task = container.event_repository().get_upcoming()
+    lang, poster = await asyncio.gather(lang_task, poster_task)
+    
     if not poster:
         await message.answer(t(lang, "cinema.poster"))
         return
@@ -218,8 +222,11 @@ async def cb_cinema_about(cb: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "cinema:schedule")
 async def cb_cinema_schedule(cb: CallbackQuery) -> None:
-    lang = await user_lang(cb)
-    poster = await container.event_repository().get_upcoming()
+    # Fetch user language and upcoming events in parallel
+    lang_task = user_lang(cb)
+    poster_task = container.event_repository().get_upcoming()
+    lang, poster = await asyncio.gather(lang_task, poster_task)
+    
     if not poster:
         await cb.message.answer(t(lang, "cinema.poster"))
         await cb.answer()
@@ -242,15 +249,19 @@ async def cb_cinema_schedule(cb: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("reg:"))
 async def register_film(cb: CallbackQuery) -> None:
-    lang = await user_lang(cb)
     event_id = cb.data.split(":", 1)[1]
     uid = cb.from_user.id if cb and cb.from_user else None
+    
+    # Run user language fetch and registration check in parallel
+    lang_task = user_lang(cb)
+    exists_task = container.event_registration_repository().get_one(event_id, uid)
+    lang, exists = await asyncio.gather(lang_task, exists_task)
+    
     name = cb.from_user.full_name if cb and cb.from_user else ""
     if not uid:
         await cb.answer("Invalid user", show_alert=True)
         return
     try:
-        exists = await container.event_registration_repository().get_one(event_id, uid)
         if exists:
             msg = t(lang, "cinema.already_registered")
         else:

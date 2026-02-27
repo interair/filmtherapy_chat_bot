@@ -16,24 +16,38 @@ router = Router()
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     uid = message.from_user.id if message and message.from_user else None
+    
+    # Run metrics and language fetch in parallel
+    metrics_task = None
     if uid:
         try:
             u = message.from_user
-            # Metrics recording
-            await container.metrics_service().record_start(
+            metrics_task = asyncio.create_task(container.metrics_service().record_start(
                 uid,
                 getattr(u, "language_code", None),
                 getattr(u, "username", None),
                 getattr(u, "first_name", None),
                 getattr(u, "last_name", None),
-            )
+            ))
         except Exception:
             pass
-    saved = (await container.user_language_repository().get(uid)) if uid else None
+
+    saved_task = asyncio.create_task(container.user_language_repository().get(uid)) if uid else None
+    
+    if saved_task:
+        saved = await saved_task
+    else:
+        saved = None
+        
     if not saved:
+        if metrics_task:
+            await metrics_task
         await message.answer(t("ru", "lang.choose"), reply_markup=lang_kbd())
         return
+    
     lang = await user_lang(message)
+    if metrics_task:
+        await metrics_task
     await message.answer(t(lang, "start.welcome"), reply_markup=main_menu(lang))
 
 

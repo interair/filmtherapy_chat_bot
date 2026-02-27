@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 from datetime import datetime, timezone, timedelta
@@ -565,18 +566,33 @@ async def my_bookings(message: Message) -> None:
         except Exception:
             return str(dt)
 
-    # Collect session bookings (consultations)
-    session_items = []
+    # Collect session bookings (consultations) and cinema registrations in parallel
+    event_repo = container.event_repository()
+    reg_repo = container.event_registration_repository()
+    
+    tasks = [
+        container.calendar_service().list_user_bookings(uid),
+        reg_repo.list_by_user(uid)
+    ]
+    
     try:
-        session_items = await container.calendar_service().list_user_bookings(uid) or []
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        session_items = results[0] if not isinstance(results[0], Exception) else []
+        if isinstance(results[0], Exception):
+            logger.error("Failed to fetch user bookings for user_id=%s: %s", uid, results[0], exc_info=True)
+            
+        regs = results[1] if not isinstance(results[1], Exception) else []
+        if isinstance(results[1], Exception):
+            logger.error("Failed to fetch cinema registrations for user_id=%s: %s", uid, results[1], exc_info=True)
     except Exception as e:
-        logger.error("Failed to fetch user bookings for user_id=%s: %s", uid, e, exc_info=True)
+        logger.error("Critical error in my_bookings parallel fetch: %s", e, exc_info=True)
         session_items = []
+        regs = []
 
     unified: list[dict] = []
 
     # Transform session bookings into unified items
-    for b in session_items:
+    for b in (session_items or []):
         try:
             start_iso = b.get("start")
             end_iso = b.get("end")
@@ -603,53 +619,60 @@ async def my_bookings(message: Message) -> None:
             logger.warning("Failed to parse booking item: %s, error: %s", b, e)
             continue
 
-    # Collect cinema registrations and map to unified items
-    event_repo = container.event_repository()
-    reg_repo = container.event_registration_repository()
+    # Map cinema registrations to unified items
     try:
-        regs = await reg_repo.list_by_user(uid)
-        for r in regs:
-            ev_id = r.get("event_id")
-            if not ev_id:
-                continue
-            try:
-                ev = await event_repo.get_by_id(ev_id)
-            except Exception as e:
-                logger.warning("Failed to fetch event id=%s for user=%s: %s", ev_id, uid, e)
-                continue
-            if not ev:
-                continue
-            when_dt = getattr(ev, "when", None)
-            when_str = ""
-            ts_sort = 0.0
-            if when_dt:
-                try:
-                    when_str = when_dt.strftime("%d-%m-%y %H:%M")
-                    ts_sort = when_dt.timestamp()
-                except Exception as e:
-                    logger.debug("Failed to format event datetime for event_id=%s: %s", ev_id, e)
-                    when_str = str(when_dt)
-                    ts_sort = 0.0
-            # Prepare start/end for calendar link (3 hours duration for events)
-            start_iso_ev = ""
-            end_iso_ev = ""
-            if when_dt:
-                with contextlib.suppress(Exception):
-                    start_iso_ev = _iso_z(when_dt)
-                    end_iso_ev = _iso_z(when_dt + timedelta(hours=3))
-            unified.append({
-                "id": str(ev_id),
-                "when_str": when_str,
-                "ts": ts_sort,
-                "title": getattr(ev, "title", ""),
-                "location": getattr(ev, "place", "") or "",
-                # Fields to fit _build_gcal_link_from_booking
-                "session_type": getattr(ev, "title", "") or "Event",
-                "start": start_iso_ev,
-                "end": end_iso_ev,
-            })
+        if regs:
+            # Fetch all events in parallel
+            event_ids = [r.get("event_id") for r in regs if r.get("event_id")]
+            events_results = await asyncio.gather(*[event_repo.get_by_id(ev_id) for ev_id in event_ids], return_exceptions=True)
+            
+            # Create a lookup map for events
+            events_map = {}
+            for ev in events_results:
+                if ev and not isinstance(ev, Exception):
+                    events_map[ev.id] = ev
+            
+            for r in regs:
+                ev_id = r.get("event_id")
+                if not ev_id:
+                    continue
+                ev = events_map.get(ev_id)
+                if not ev:
+                    continue
+                
+                when_dt = getattr(ev, "when", None)
+                when_str = ""
+                ts_sort = 0.0
+                if when_dt:
+                    try:
+                        when_str = when_dt.strftime("%d-%m-%y %H:%M")
+                        ts_sort = when_dt.timestamp()
+                    except Exception as e:
+                        logger.debug("Failed to format event datetime for event_id=%s: %s", ev_id, e)
+                        when_str = str(when_dt)
+                        ts_sort = 0.0
+                
+                # Prepare start/end for calendar link (3 hours duration for events)
+                start_iso_ev = ""
+                end_iso_ev = ""
+                if when_dt:
+                    with contextlib.suppress(Exception):
+                        start_iso_ev = _iso_z(when_dt)
+                        end_iso_ev = _iso_z(when_dt + timedelta(hours=3))
+                
+                unified.append({
+                    "id": str(ev_id),
+                    "when_str": when_str,
+                    "ts": ts_sort,
+                    "title": getattr(ev, "title", ""),
+                    "location": getattr(ev, "place", "") or "",
+                    # Fields to fit _build_gcal_link_from_booking
+                    "session_type": getattr(ev, "title", "") or "Event",
+                    "start": start_iso_ev,
+                    "end": end_iso_ev,
+                })
     except Exception as e:
-        logger.error("Failed to fetch cinema registrations for user_id=%s: %s", uid, e, exc_info=True)
+        logger.error("Failed to process cinema registrations for user_id=%s: %s", uid, e, exc_info=True)
 
     if not unified:
         await message.answer(t(lang, "book.my_none"))

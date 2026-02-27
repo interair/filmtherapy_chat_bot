@@ -31,7 +31,3 @@ def lang_kbd() -> InlineKeyboardMarkup:
         [("Русский", "setlang:ru"), ("English", "setlang:en")]
     ])
 
-
-def next_dates(n: int = 7) -> list[str]:
-    today = datetime.now(timezone.utc).date()
-    return [(today + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(n)]

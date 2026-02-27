@@ -41,7 +41,7 @@ def _dumps_sorted_bytes(obj: Any) -> bytes:
 
 
 @lru_cache(maxsize=4096)
-def _validate_cached(model_cls: Type[BaseModel], payload: bytes) -> BaseModel:
+def _validate_cached(model_cls: Type[T], payload: bytes) -> T:
     return model_cls.model_validate_json(payload)
 
 
@@ -843,3 +843,4 @@ class SessionLocationsRepository:
     async def list_for(self, type_key: str) -> List[str]:
         key = str(type_key).strip()
         m = await self.get_map()
+        return m.get(key, [])

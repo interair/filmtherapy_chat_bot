@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List
@@ -75,12 +75,14 @@ class BookingFlow:
         start_date = datetime.strptime(iso_dates[0], "%Y-%m-%d").replace(tzinfo=timezone.utc)
         end_date = datetime.strptime(iso_dates[-1], "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
         
-        # Fetch all bookings for the period in a single query
-        all_bookings = await self.calendar._bookings_repo.get_range(start_date, end_date)
-        
+        # Parallel fetch bookings and schedule rules
+        bookings_task = self.calendar._bookings_repo.get_range(start_date, end_date)
+        rules_task = self._get_schedule_rules()
+        all_bookings, schedule_rules = await asyncio.gather(bookings_task, rules_task)
+
         # Group bookings by date (ISO keys)
         bookings_by_date = {}
-        for booking in all_bookings:
+        for booking in (all_bookings or []):
             try:
                 start_str = booking.get("start")
                 if isinstance(start_str, str):
@@ -92,9 +94,6 @@ class BookingFlow:
             except Exception as e:
                 logger.exception("Error while grouping booking by date in get_available_dates", e)
                 continue
-        
-        # Get schedule rules (with caching)
-        schedule_rules = await self._get_schedule_rules()
         
         # Check each date for available slots
         out_dates: list[str] = []
