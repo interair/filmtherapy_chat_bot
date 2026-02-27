@@ -22,11 +22,18 @@ class BookingStatus(Enum):
     CANCELLED = "cancelled"
 
 
-class Location(BaseModel):
+class BaseConfigModel(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        str_strip_whitespace=True
+    )
+
+
+class Location(BaseConfigModel):
     name: str = Field(..., min_length=1)
 
 
-class Event(BaseModel):
+class Event(BaseConfigModel):
     id: str = Field(..., min_length=1)
     title: str = Field(..., min_length=1)
     when: datetime
@@ -35,14 +42,8 @@ class Event(BaseModel):
     description: Optional[str] = None
     photo: Optional[str] = None  # filename in data/ (served at /static/<filename>)
 
-    model_config = ConfigDict(
-        # For Jinja2 compatibility, allow attribute-style access and JSON serialization
-        populate_by_name=True,
-        str_strip_whitespace=True
-    )
 
-
-class EventCreate(BaseModel):
+class EventCreate(BaseConfigModel):
     """DTO for creating Event instances."""
     title: str = Field(..., min_length=1)
     when: datetime
@@ -50,13 +51,8 @@ class EventCreate(BaseModel):
     price: Optional[float] = None
     description: Optional[str] = None
 
-    model_config = ConfigDict(
-        populate_by_name=True,
-        str_strip_whitespace=True
-    )
 
-
-class Booking(BaseModel):
+class Booking(BaseConfigModel):
     id: str = Field(..., min_length=1)
     user_id: Optional[str] = None
     name: Optional[str] = None
@@ -105,7 +101,7 @@ class Booking(BaseModel):
     )
 
 
-class ScheduleRule(BaseModel):
+class ScheduleRule(BaseConfigModel):
     """Typed schedule rule stored in Firestore.
     Document id is a deterministic composite key: f"{date}|{start}|{location}|{session_type}".
     date uses dd-mm-yy, time uses HH:MM.
@@ -182,8 +178,3 @@ class ScheduleRule(BaseModel):
             doc_id = f"{self.date}|{self.start}|{loc}|{sess}"
             object.__setattr__(self, "id", doc_id)
         return self
-
-    model_config = ConfigDict(
-        populate_by_name=True,
-        str_strip_whitespace=True
-    )

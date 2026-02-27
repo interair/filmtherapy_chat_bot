@@ -332,15 +332,27 @@ def location_form(name: str = Form(...)) -> "LocationCreate":
         raise HTTPException(status_code=422, detail=e.errors())
 
 
+def render(request: Request, template: str, context: dict | None = None, flags: QueryFlags | None = None):
+    ctx = {
+        "request": request,
+        "bot_running": is_bot_running(),
+        "time_str": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    if flags:
+        ctx.update({
+            "saved": flags.saved,
+            "deleted": flags.deleted,
+            "added": flags.added,
+            "updated": flags.updated,
+            "created": flags.created,
+        })
+    if context:
+        ctx.update(context)
+    return templates.TemplateResponse(template, ctx)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def web_index(request: Request, metrics = Depends(get_metrics_service), flags: QueryFlags = Depends(), _: None = Depends(verify_web_auth)):
-    saved = flags.saved
-    deleted = flags.deleted
-    added = flags.added
-    updated = flags.updated
-    time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-    
-    # Parallelize metrics and bookings fetching
     overview_task = metrics.today_overview()
     top_features_task = metrics.feature_usage(days=7, top_n=3)
     new_bookings_task = compute_new_bookings_today()
@@ -349,55 +361,31 @@ async def web_index(request: Request, metrics = Depends(get_metrics_service), fl
         overview_task, top_features_task, new_bookings_task
     )
     
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "saved": saved,
-        "deleted": deleted,
-        "added": added,
-        "updated": updated,
-        "time_str": time_str,
+    return render(request, "index.html", {
         "metrics_overview": overview,
         "top_features": top_features,
         "new_bookings_today": new_bookings_today,
-        "bot_running": is_bot_running(),
-    })
+    }, flags=flags)
 
 
 @app.get("/system", response_class=HTMLResponse)
 async def web_system(request: Request, _: None = Depends(verify_web_auth)):
-    time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-
-    # Determine bot mode
     bot_mode = "webhook" if settings.use_webhook and settings.base_url else "polling"
-
-    # Build configuration dict using a whitelist of non-sensitive fields
     cfg = settings.model_dump()
     allowed_keys = {"admins", "base_url", "default_lang", "use_webhook", "web_port"}
-    safe_cfg = {}
-    for k in sorted(allowed_keys):
-        if k in cfg:
-            safe_cfg[k] = cfg.get(k)
+    safe_cfg = {k: cfg[k] for k in sorted(allowed_keys) if k in cfg}
 
-    # Add a few useful env/runtime values
-    extra_env_keys = [
-        "GOOGLE_CLOUD_PROJECT", "K_SERVICE", "K_REVISION", "K_CONFIGURATION",
-    ]
+    extra_env_keys = ["GOOGLE_CLOUD_PROJECT", "K_SERVICE", "K_REVISION", "K_CONFIGURATION"]
     runtime_env = {k: os.getenv(k) for k in extra_env_keys if os.getenv(k) is not None}
 
-    # Resolve commit/version information via helper
-    commit = _get_commit_hash()
-
-    context = {
-        "request": request,
-        "time_str": time_str,
+    return render(request, "system.html", {
         "bot_status": ("Running" if is_bot_running() else "Stopped"),
         "bot_mode": bot_mode,
         "web_editor": ("Enabled" if settings.is_web_enabled else "Disabled"),
         "config": safe_cfg,
         "runtime_env": runtime_env,
-        "commit": commit,
-    }
-    return templates.TemplateResponse("system.html", context)
+        "commit": _get_commit_hash(),
+    })
 
 
 @app.get("/events", response_class=HTMLResponse)
@@ -411,23 +399,15 @@ async def web_events(
     attendees: dict[str, list[dict]] = {}
     
     if events:
-        try:
-            # Parallelize registrations fetching for all events
-            results = await asyncio.gather(
-                *[reg_repo.get_by_event(ev.id) for ev in events],
-                return_exceptions=True
-            )
-            for ev, res in zip(events, results):
-                if isinstance(res, Exception):
-                    logging.getLogger(__name__).error(f"Failed to get registrations for event {ev.id}: {res}")
-                    attendees[ev.id] = []
-                else:
-                    attendees[ev.id] = res if res else []
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Failed to load event attendees: {e}")
-            attendees = {ev.id: [] for ev in events}
+        # Parallelize registrations fetching for all events
+        results = await asyncio.gather(
+            *[reg_repo.get_by_event(ev.id) for ev in events],
+            return_exceptions=True
+        )
+        for ev, res in zip(events, results):
+            attendees[ev.id] = res if not isinstance(res, Exception) and res else []
     
-    return templates.TemplateResponse("events.html", {"request": request, "poster": events, "attendees": attendees})
+    return render(request, "events.html", {"poster": events, "attendees": attendees})
 
 
 @app.get("/events/add", response_class=HTMLResponse)
@@ -436,9 +416,8 @@ async def web_events_add(
     loc_repo: LocationRepository = Depends(get_location_service),
     _: None = Depends(verify_web_auth),
 ):
-    loc_models = await loc_repo.get_all()
-    locs = [l.name for l in loc_models]
-    return templates.TemplateResponse("events_add.html", {"request": request, "locs": locs})
+    locs = [l.name for l in await loc_repo.get_all()]
+    return render(request, "events_add.html", {"locs": locs})
 
 
 @app.get("/events/edit/{id}", response_class=HTMLResponse)
@@ -452,14 +431,13 @@ async def web_events_edit(
     event = await event_repo.get_by_id(id)
     if not event:
         return HTMLResponse(content="Event not found", status_code=404)
-    # Format datetime for input value (HTML datetime-local does not support timezone)
+    # Format datetime for input value
     try:
         when_value = event.when.replace(microsecond=0, tzinfo=None).isoformat(timespec="seconds")
-    except (AttributeError, ValueError, TypeError):
-        when_value = event.when.replace(microsecond=0).isoformat()
-    loc_models = await loc_repo.get_all()
-    locs = [l.name for l in loc_models]
-    return templates.TemplateResponse("events_edit.html", {"request": request, "event": event, "locs": locs, "when_value": when_value})
+    except Exception:
+        when_value = event.when.isoformat()
+    locs = [l.name for l in await loc_repo.get_all()]
+    return render(request, "events_edit.html", {"event": event, "locs": locs, "when_value": when_value})
 
 
 @app.post("/events/save")
@@ -544,8 +522,7 @@ async def web_quiz(
     recs = cfg.get("recs", {})
     moods_text = "\n".join(f"{m.get('title','')}|{m.get('code','')}" for m in moods)
     companies_text = "\n".join(f"{c.get('title','')}|{c.get('code','')}" for c in companies)
-    return templates.TemplateResponse("quiz.html", {
-        "request": request,
+    return render(request, "quiz.html", {
         "moods": moods,
         "companies": companies,
         "recs": recs,
@@ -585,10 +562,9 @@ async def web_bookings(
     flags: QueryFlags = Depends(),
     _: None = Depends(verify_web_auth),
 ):
-    deleted = flags.deleted
     raw = await calendar_service.list_all_bookings()
     items = BookingView.list_from_raw(raw)
-    return templates.TemplateResponse("bookings.html", {"request": request, "items": items, "deleted": deleted})
+    return render(request, "bookings.html", {"items": items}, flags=flags)
 
 
 @app.get("/schedule", response_class=HTMLResponse)
@@ -599,23 +575,14 @@ async def web_schedule(
     flags: QueryFlags = Depends(),
     _: None = Depends(verify_web_auth),
 ):
-    saved = flags.saved
     rules = await sched_repo.get()
-    # Load available locations for dropdown
-    try:
-        loc_items = await loc_repo.get_all()
-        locations = [l.name for l in loc_items]
-    except BotException:
-        locations = []
-    # Define known session types for dropdown (explicit: Онлайн / Офлайн)
+    locs = [l.name for l in await loc_repo.get_all()]
     session_types = ["Онлайн", "Офлайн"]
-    return templates.TemplateResponse("schedule.html", {
-        "request": request,
-        "saved": saved,
+    return render(request, "schedule.html", {
         "rules": rules,
-        "locations": locations,
+        "locations": locs,
         "session_types": session_types,
-    })
+    }, flags=flags)
 
 
 @app.post("/schedule/save")
@@ -751,19 +718,14 @@ async def web_about(
     flags: QueryFlags = Depends(),
     _: None = Depends(verify_web_auth),
 ):
-    saved = flags.saved
-    deleted = flags.deleted
     cfg = await about_repo.get()
     fn = cfg.get("photo") if isinstance(cfg, dict) else None
     photo = fn if isinstance(fn, str) and fn else ""
     cinema_photos = await about_repo.list_cinema_photos()
-    return templates.TemplateResponse("about.html", {
-        "request": request,
-        "saved": saved,
-        "deleted": deleted,
+    return render(request, "about.html", {
         "photo": photo,
         "cinema_photos": cinema_photos,
-    })
+    }, flags=flags)
 
 
 @app.post("/about/save")
@@ -857,20 +819,9 @@ async def web_locations(
     flags: QueryFlags = Depends(),
     _: None = Depends(verify_web_auth),
 ):
-    saved = flags.saved
-    deleted = flags.deleted
-    loc_models = await loc_repo.get_all()
-    locs = [l.name for l in loc_models]
-    items = []
-    for s in locs:
-        enc = b64_url_encode(s)
-        items.append({"name": s, "enc": enc})
-    return templates.TemplateResponse("locations.html", {
-        "request": request,
-        "items": items,
-        "saved": saved,
-        "deleted": deleted,
-    })
+    locs = [l.name for l in await loc_repo.get_all()]
+    items = [{"name": s, "enc": b64_url_encode(s)} for s in locs]
+    return render(request, "locations.html", {"items": items}, flags=flags)
 
 
 @app.post("/locations/add")
@@ -914,40 +865,24 @@ async def web_locations_by_type(
     flags: QueryFlags = Depends(),
     _: None = Depends(verify_web_auth),
 ):
-    saved = flags.saved
-    deleted = flags.deleted
     m = await repo.get_map()
-    # Filter out any 'online' keys from the map (both ru/en)
     def _is_online_key(s: str) -> bool:
         s_low = (s or "").strip().lower()
         return ("online" in s_low) or ("онлайн" in s_low)
     m = {k: v for k, v in m.items() if not _is_online_key(k)}
-    # Also list all known locations to help adding
-    try:
-        loc_models = await loc_repo.get_all()
-        all_locations = [l.name for l in loc_models]
-    except Exception:
-        logger.debug("Failed to load all locations", exc_info=True)
-        all_locations = []
-    # Prepare view model with encoded values for delete links
+    
+    all_locations = [l.name for l in await loc_repo.get_all()]
     items = []
     for key in sorted(m.keys()):
-        locs = []
-        for s in m[key]:
-            enc = b64_url_encode(s)
-            locs.append({"name": s, "enc": enc})
-        key_enc = b64_url_encode(key)
-        items.append({"type": key, "type_enc": key_enc, "locs": locs})
-    # Build session types list excluding ONLINE
-    session_types = [it.value for it in SessionType if getattr(SessionType, 'ONLINE', None) is None or it != SessionType.ONLINE]
-    return templates.TemplateResponse("locations_by_type.html", {
-        "request": request,
+        locs = [{"name": s, "enc": b64_url_encode(s)} for s in m[key]]
+        items.append({"type": key, "type_enc": b64_url_encode(key), "locs": locs})
+    
+    session_types = [it.value for it in SessionType if not _is_online_key(it.value)]
+    return render(request, "locations_by_type.html", {
         "items": items,
         "all_locations": all_locations,
         "session_types": session_types,
-        "saved": saved,
-        "deleted": deleted,
-    })
+    }, flags=flags)
 
 
 @app.post("/locations/types/add")
