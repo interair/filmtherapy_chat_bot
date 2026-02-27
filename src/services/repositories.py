@@ -365,9 +365,16 @@ class AboutRepository:
         for it in items:
             if not isinstance(it, str) or not it:
                 continue
+            # Try as-is first
             path = os.path.join(DATA_DIR, it)
             if os.path.exists(path):
                 out.append(it)
+                continue
+            # If it's a legacy entry without 'cinema/' prefix, try that
+            if not it.startswith("cinema/"):
+                alt_path = os.path.join(DATA_DIR, "cinema", it)
+                if os.path.exists(alt_path):
+                    out.append(f"cinema/{it}")
         return out
 
     async def add_cinema_photo(self, filename: str) -> None:
@@ -377,6 +384,11 @@ class AboutRepository:
             items = []
         if filename not in items:
             items.append(filename)
+            # Also clean up old prefixless entry if we are adding the prefixed one
+            if filename.startswith("cinema/"):
+                short = filename[7:]
+                if short in items:
+                    items.remove(short)
         await self._doc.set({"cinema_photos": items}, merge=True)
 
     async def remove_cinema_photo(self, filename: str) -> None:
@@ -384,8 +396,15 @@ class AboutRepository:
         items = data.get("cinema_photos")
         if not isinstance(items, list):
             items = []
-        items = [x for x in items if x != filename]
-        await self._doc.set({"cinema_photos": items}, merge=True)
+        # Match both with and without prefix for removal
+        new_items = []
+        for it in items:
+            if it == filename:
+                continue
+            if filename.startswith("cinema/") and it == filename[7:]:
+                continue
+            new_items.append(it)
+        await self._doc.set({"cinema_photos": new_items}, merge=True)
 
 
 class ScheduleRepository:
