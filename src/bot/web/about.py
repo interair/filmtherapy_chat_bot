@@ -22,35 +22,38 @@ async def web_about(
 ):
     config = await about_repo.get_config()
     cinema_photos = await about_repo.list_cinema_photos()
-    return render(request, "about.html", {"config": config, "cinema_photos": cinema_photos}, flags=flags)
+    return render(request, "about.html", {
+        "config": config,
+        "photo": config.get("photo"),
+        "cinema_photos": cinema_photos
+    }, flags=flags)
 
 @router.post("/save")
 async def web_about_save(
-    request: Request,
+    photo: UploadFile = File(None),
     about_repo: AboutRepository = Depends(get_about_repository)
 ):
-    form = await request.form()
-    data = {
-        "description": str(form.get("description", "")),
-        "address": str(form.get("address", "")),
-        "how_to_get": str(form.get("how_to_get", "")),
-    }
-    await about_repo.update_config(data)
+    from .common import ROOT_DIR
+    dst = ROOT_DIR / "data"
+    name = await save_upload(photo, dst)
+    if name:
+        await about_repo.set_photo(name)
     return RedirectResponse(url="/about?saved=1", status_code=303)
 
 @router.post("/cinema/add")
 async def web_about_cinema_add(
-    file: UploadFile = File(...),
+    photos: list[UploadFile] = File(...),
     about_repo: AboutRepository = Depends(get_about_repository)
 ):
     from .common import ROOT_DIR
     dst = ROOT_DIR / "data" / "cinema"
-    name = await save_upload(file, dst)
-    if name:
-        await about_repo.add_cinema_photo(name)
+    for photo in photos:
+        name = await save_upload(photo, dst)
+        if name:
+            await about_repo.add_cinema_photo(f"cinema/{name}")
     return RedirectResponse(url="/about?added=1", status_code=303)
 
-@router.post("/cinema/delete/{name}")
+@router.get("/cinema/delete/{name:path}")
 async def web_about_cinema_delete(
     name: str,
     about_repo: AboutRepository = Depends(get_about_repository)

@@ -57,6 +57,7 @@ class EventService:
             place=dto.place,
             price=dto.price,
             description=dto.description,
+            photo=dto.photo,
         )
         created = await self._repo.create(ev)
         logger.info("EventService: created id=%s", created.id)

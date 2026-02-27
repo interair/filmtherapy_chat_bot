@@ -49,6 +49,7 @@ class EventCreate(BaseConfigModel):
     place: str = Field(..., min_length=1)
     price: Optional[float] = None
     description: Optional[str] = None
+    photo: Optional[str] = None
 
 
 class Booking(BaseConfigModel):

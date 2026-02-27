@@ -74,6 +74,11 @@ async def web_events_save(
     
     try:
         if event_id:
+            # Preserve existing photo if not uploading a new one
+            existing = await event_repo.get_by_id(event_id)
+            if existing and not photo_name:
+                data["photo"] = existing.photo
+            
             data["id"] = event_id
             await event_repo.update(data)
             return RedirectResponse(url="/events?updated=1", status_code=303)
@@ -86,7 +91,7 @@ async def web_events_save(
         logger.error("Failed to save event: %s", e, exc_info=True)
         return RedirectResponse(url="/events?error=1", status_code=303)
 
-@router.post("/delete/{id}")
+@router.get("/delete/{id}")
 async def web_events_delete(id: str, event_repo: EventRepository = Depends(get_event_repository)):
     await event_repo.delete(id)
     return RedirectResponse(url="/events?deleted=1", status_code=303)
