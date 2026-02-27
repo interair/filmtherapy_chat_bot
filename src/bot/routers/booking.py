@@ -450,7 +450,7 @@ async def choose_time(cb: CallbackQuery, state: FSMContext) -> None:
     try:
         timestamp = float(ts_str)
         time_slot = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-    except (ValueError, TypeError, OSError):
+    except ValueError, TypeError, OSError:
         await cb.answer(t(lang, "error.invalid_datetime"), show_alert=True)
         return
 

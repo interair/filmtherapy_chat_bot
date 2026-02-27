@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # External Services
     base_url: str | None = Field(default=None, env="BASE_URL")
     use_webhook: bool = Field(default=True, env="USE_WEBHOOK")
+    debug: bool = Field(default=False, env="DEBUG")
     
     model_config = SettingsConfigDict(
         env_file=".env",

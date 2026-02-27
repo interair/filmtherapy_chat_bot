@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+import sys
 from datetime import datetime
 from typing import List, Optional
 
@@ -9,6 +10,17 @@ from .models import Event, EventCreate
 from .repositories import EventRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _generate_event_id() -> str:
+    """Helper to generate a time-ordered UUID string if possible."""
+    # uuid.uuid7() is new in Python 3.14 (PEP 723)
+    # We use it if available for better indexing, fallback to uuid4 on older versions.
+    if sys.version_info >= (3, 14):
+        u = uuid.uuid7()
+    else:
+        u = uuid.uuid4()
+    return f"event-{u}"
 
 
 class EventService:
@@ -30,7 +42,7 @@ class EventService:
         self,
         dto: EventCreate,
     ) -> Event:
-        event_id = f"event-{uuid.uuid4()}"
+        event_id = _generate_event_id()
         logger.info(
             "EventService: create_event id=%s title=%s when=%s place=%s price=%s",
             event_id,

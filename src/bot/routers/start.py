@@ -6,7 +6,7 @@ from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, CallbackQuery, FSInputFile
 
-from ..utils import user_lang, lang_kbd
+from ..utils import user_lang, lang_kbd, safe_create_task
 from ...container import container
 from ...i18n.texts import t
 from ...keyboards import main_menu
@@ -23,18 +23,18 @@ async def cmd_start(message: Message) -> None:
     if not saved:
         if uid:
             u = message.from_user
-            asyncio.create_task(container.metrics_service().record_start(
+            safe_create_task(container.metrics_service().record_start(
                 uid,
                 getattr(u, "language_code", None),
                 getattr(u, "username", None),
                 getattr(u, "first_name", None),
                 getattr(u, "last_name", None),
-            ))
+            ), eager_start=True)
         await message.answer(t("ru", "lang.choose"), reply_markup=lang_kbd())
         return
     
     lang = await user_lang(message)
-    asyncio.create_task(container.metrics_service().record_interaction(uid, "command:/start"))
+    safe_create_task(container.metrics_service().record_interaction(uid, "command:/start"), eager_start=True)
     await message.answer(t(lang, "start.welcome"), reply_markup=main_menu(lang))
 
 

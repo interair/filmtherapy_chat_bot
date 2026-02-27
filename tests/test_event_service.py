@@ -30,11 +30,10 @@ async def test_list_upcoming_events_returns_repo_results():
 async def test_create_event_generates_uuid_and_calls_repo(monkeypatch):
     # Arrange
     fake_uuid_str = "11111111-2222-3333-4444-555555555555"
-    fake_uuid_obj = SimpleNamespace(__str__=lambda: fake_uuid_str)
 
-    # Patch uuid.uuid4 used inside the service module
+    # Patch the id generator helper
     import src.services.event_service as event_service_mod
-    monkeypatch.setattr(event_service_mod.uuid, "uuid4", lambda: fake_uuid_obj)
+    monkeypatch.setattr(event_service_mod, "_generate_event_id", lambda: f"event-{fake_uuid_str}")
 
     # Mock repo so that create returns the same event it receives
     mock_repo = SimpleNamespace(
