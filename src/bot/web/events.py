@@ -44,7 +44,12 @@ async def web_events_edit(
     ev = await event_repo.get_by_id(id)
     models = await loc_repo.get_all()
     locs = [l.name for l in models]
-    return render(request, "events_edit.html", {"event": ev, "locs": locs})
+    
+    when_value = ""
+    if ev and ev.when:
+        when_value = ev.when.strftime("%Y-%m-%dT%H:%M")
+        
+    return render(request, "events_edit.html", {"event": ev, "locs": locs, "when_value": when_value})
 
 @router.post("/save")
 async def web_events_save(
