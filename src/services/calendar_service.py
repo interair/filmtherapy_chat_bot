@@ -130,14 +130,11 @@ class CalendarService:
     # --- Matching helpers (to keep logic in one place) -----------------------
     def _match_rule(self, date: datetime, rule: ScheduleRule, sel_loc: str, norm_in: str) -> Optional[tuple[datetime, datetime, int, int, str]]:
         """Return (window_start, window_end, duration_min, interval_min, r_loc_norm) if the rule applies, else None.
-        Simplifies matching by handling date (dd-mm-yy), location, type, and time window.
+        Simplifies matching by handling weekday, location, type, and time window.
         """
         try:
-            rule_date = str(rule.date).strip()
-            if not rule_date:
-                return None
-            # Compare against provided date in dd-mm-yy format
-            if rule_date != date.strftime("%d-%m-%y"):
+            # Compare against provided date's weekday
+            if rule.day_of_week != date.weekday():
                 return None
         except Exception:
             return None
@@ -261,6 +258,7 @@ class CalendarService:
         name: str,
         phone: str | None,
         price: int = 100,
+        comment: str | None = None,
     ) -> Dict:
         # Ensure not double-booked: query only potentially conflicting bookings
         s_start = self.ensure_utc(slot.start)
@@ -292,6 +290,7 @@ class CalendarService:
             "session_type": slot.session_type,
             "status": "pending_payment",
             "price": price,
+            "comment": comment,
             "created_at": iso(datetime.now(timezone.utc)),
         }
         # Persist to Firestore

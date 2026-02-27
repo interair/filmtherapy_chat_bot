@@ -64,6 +64,7 @@ class Booking(BaseConfigModel):
     session_type: Optional[SessionType] = None
     status: Optional[BookingStatus] = None
     price: Optional[float] = None
+    comment: Optional[str] = None
     created_at: Optional[datetime] = None
 
     # Shared enum coercion for validators
@@ -103,11 +104,11 @@ class Booking(BaseConfigModel):
 
 class ScheduleRule(BaseConfigModel):
     """Typed schedule rule stored in Firestore.
-    Document id is a deterministic composite key: f"{date}|{start}|{location}|{session_type}".
-    date uses dd-mm-yy, time uses HH:MM.
+    Document id is a deterministic composite key: f"{day_of_week}|{start}|{location}|{session_type}".
+    day_of_week is 0-6 (0=Mon, 6=Sun), time uses HH:MM.
     """
     id: Optional[str] = None
-    date: str
+    day_of_week: int = Field(..., ge=0, le=6)
     start: str
     end: str
     duration: int = 50
@@ -116,15 +117,16 @@ class ScheduleRule(BaseConfigModel):
     session_type: Optional[str] = ""
     deleted: bool = False
 
-    @field_validator("date")
+    @field_validator("day_of_week", mode="before")
     @classmethod
-    def _validate_date(cls, v: str) -> str:
-        s = str(v).strip()
+    def _validate_day_of_week(cls, v) -> int:
         try:
-            datetime.strptime(s, "%d-%m-%y")
-        except Exception:
-            raise ValueError("date must be in dd-mm-yy format")
-        return s
+            val = int(v)
+            if 0 <= val <= 6:
+                return val
+            raise ValueError("day_of_week must be between 0 and 6")
+        except (ValueError, TypeError):
+            raise ValueError("day_of_week must be an integer between 0 and 6")
 
     @staticmethod
     def _valid_hhmm(s: str) -> bool:
@@ -175,6 +177,6 @@ class ScheduleRule(BaseConfigModel):
         object.__setattr__(self, "session_type", sess)
         # Ensure id
         if not self.id or not str(self.id).strip():
-            doc_id = f"{self.date}|{self.start}|{loc}|{sess}"
+            doc_id = f"{self.day_of_week}|{self.start}|{loc}|{sess}"
             object.__setattr__(self, "id", doc_id)
         return self

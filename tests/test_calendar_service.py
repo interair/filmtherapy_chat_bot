@@ -170,9 +170,9 @@ def test_parse_hhmm_and_normalize_and_overlaps():
 # ---------------------- list_available_slots tests ----------------------
 @pytest.mark.asyncio
 async def test_list_available_slots_offline_specific_location(service: CalendarService, repos):
-    # Rule for 01-01-50, 10:00-12:00, 60-min slots at exact location
+    # Rule for specific day of week, 10:00-12:00, 60-min slots at exact location
     date = datetime(2050, 1, 1, tzinfo=timezone.utc)
-    rule = {"date": "01-01-50", "start": "10:00", "end": "12:00", "duration": 60, "interval": 60, "location": "IJsbaanpad 9", "session_type": "Очно"}
+    rule = {"day_of_week": date.weekday(), "start": "10:00", "end": "12:00", "duration": 60, "interval": 60, "location": "IJsbaanpad 9", "session_type": "Очно"}
     repos.schedule.rules = [rule]
 
     slots = await service.list_available_slots(date, location="IJsbaanpad 9", session_type="Очно")
@@ -187,7 +187,7 @@ async def test_list_available_slots_offline_specific_location(service: CalendarS
 @pytest.mark.asyncio
 async def test_list_available_slots_any_location_uses_selected(service: CalendarService, repos):
     date = datetime(2050, 1, 1, tzinfo=timezone.utc)
-    rule = {"date": "01-01-50", "start": "10:00", "end": "12:00", "duration": 60, "interval": 60, "location": "any", "session_type": "Очно"}
+    rule = {"day_of_week": date.weekday(), "start": "10:00", "end": "12:00", "duration": 60, "interval": 60, "location": "any", "session_type": "Очно"}
     repos.schedule.rules = [rule]
 
     slots = await service.list_available_slots(date, location="Van Eeghenlaan 27", session_type="Очно")
@@ -198,7 +198,7 @@ async def test_list_available_slots_any_location_uses_selected(service: Calendar
 @pytest.mark.asyncio
 async def test_list_available_slots_online_only_rule(service: CalendarService, repos):
     date = datetime(2050, 1, 1, tzinfo=timezone.utc)
-    rule = {"date": "01-01-50", "start": "09:00", "end": "10:00", "duration": 30, "interval": 30, "location": "Онлайн", "session_type": "Онлайн"}
+    rule = {"day_of_week": date.weekday(), "start": "09:00", "end": "10:00", "duration": 30, "interval": 30, "location": "Онлайн", "session_type": "Онлайн"}
     repos.schedule.rules = [rule]
 
     # Online selection matches
@@ -214,7 +214,7 @@ async def test_list_available_slots_online_only_rule(service: CalendarService, r
 @pytest.mark.asyncio
 async def test_list_available_slots_excludes_busy_intervals(service: CalendarService, repos):
     date = datetime(2050, 1, 1, tzinfo=timezone.utc)
-    rule = {"date": "01-01-50", "start": "10:00", "end": "12:00", "duration": 60, "interval": 60, "location": "IJsbaanpad 9", "session_type": "Очно"}
+    rule = {"day_of_week": date.weekday(), "start": "10:00", "end": "12:00", "duration": 60, "interval": 60, "location": "IJsbaanpad 9", "session_type": "Очно"}
     repos.schedule.rules = [rule]
 
     # Pre-existing booking occupying 10:00-11:00 should remove the first slot
@@ -240,10 +240,11 @@ async def test_create_reservation_success_and_persist(service: CalendarService, 
     end = start + timedelta(minutes=60)
     slot = make_slot(start, end, location="IJsbaanpad 9", session_type="Очно")
 
-    booking = await service.create_reservation(user_id=42, slot=slot, name="John", phone="123")
+    booking = await service.create_reservation(user_id=42, slot=slot, name="John", phone="123", comment="Hello")
 
     assert booking["status"] == "pending_payment"
     assert booking["user_id"] == "42"
+    assert booking["comment"] == "Hello"
     assert booking["start"].endswith("Z")
     assert await repos.bookings.get_by_id_raw(booking["id"]) is not None
 

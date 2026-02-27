@@ -24,6 +24,7 @@ class BookingView(pydantic.BaseModel):
     status_color: str = "orange"
     date_str: str = "Unknown"
     time_str: str = "Unknown"
+    comment: str = ""
     created_at: str = "Unknown"
 
     @classmethod
@@ -54,6 +55,7 @@ class BookingView(pydantic.BaseModel):
             status_color=status_color,
             date_str=date_str,
             time_str=time_str,
+            comment=str(booking.get('comment', '') or ''),
             created_at=str(booking.get('created_at', 'Unknown') or 'Unknown'),
         )
 

@@ -173,6 +173,7 @@ class BookingStates(StatesGroup):
     choosing_location = State()
     choosing_date = State()
     choosing_time = State()
+    choosing_comment = State()
     confirming = State()
 
 
@@ -452,31 +453,79 @@ async def choose_time(cb: CallbackQuery, state: FSMContext) -> None:
         await cb.answer(t(lang, "error.invalid_datetime"), show_alert=True)
         return
 
+    await state.update_data(time_slot=timestamp)
+    await state.set_state(BookingStates.choosing_comment)
+    
+    kbd = ik_kbd([[
+        (t(lang, "book.skip_button"), "skip_comment")
+    ]])
+    await cb.message.edit_text(t(lang, "book.enter_comment"), reply_markup=kbd)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "skip_comment", BookingStates.choosing_comment)
+async def skip_comment(cb: CallbackQuery, state: FSMContext) -> None:
+    await state.update_data(comment=None)
+    await create_final_booking(cb, state)
+
+
+@router.message(BookingStates.choosing_comment)
+async def handle_comment(message: Message, state: FSMContext) -> None:
+    await state.update_data(comment=message.text)
+    await create_final_booking(message, state)
+
+
+async def create_final_booking(event: Message | CallbackQuery, state: FSMContext) -> None:
+    # event can be Message (from handle_comment) or CallbackQuery (from skip_comment)
+    lang = await user_lang(event)
     data = await state.get_data()
+    
+    user = event.from_user
+    user_id = user.id
+    user_name = user.full_name
+    
+    timestamp = data.get("time_slot")
+    if timestamp is None:
+        await state.clear()
+        return
+        
+    time_slot = datetime.fromtimestamp(float(timestamp), tz=timezone.utc)
+    
     booking_data = BookingData(
         session_type=data.get("session_type"),
         location=data.get("location"),
         date=data.get("date"),
+        comment=data.get("comment"),
     )
 
     try:
         booking = await container.booking_flow().create_booking(
-            cb.from_user.id,
-            cb.from_user.full_name,
+            user_id,
+            user_name,
             booking_data,
             time_slot,
         )
-        # Show payment/cancel options (payments unavailable yet)
+        
+        # Show payment/cancel options
         kbd = ik_kbd([[
             ("❌ " + t(lang, "book.cancel_button"), f"cancel:{booking['id']}") ,
             ("💳 " + t(lang, "book.pay_button"), f"pay:{booking['id']}")
         ]])
-        await cb.message.edit_text(t(lang, "book.pay_unavailable"), reply_markup=kbd)
+        
+        text = t(lang, "book.pay_unavailable")
+        if isinstance(event, CallbackQuery):
+            await event.message.edit_text(text, reply_markup=kbd)
+            await event.answer()
+        else:
+            await event.answer(text, reply_markup=kbd)
+            
     except ValidationError:
-        await cb.answer(t(lang, "book.no_slots"), show_alert=True)
-        await state.clear()
-        return
-
+        text = t(lang, "book.no_slots")
+        if isinstance(event, CallbackQuery):
+            await event.answer(text, show_alert=True)
+        else:
+            await event.answer(text)
+            
     await state.clear()
 
 

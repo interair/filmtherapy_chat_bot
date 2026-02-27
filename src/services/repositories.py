@@ -453,7 +453,7 @@ class ScheduleRepository:
                 except Exception as e2:
                     logger.error("Failed to validate ScheduleRule doc_id=%s: %s", doc.id, e2, exc_info=True)
                     continue
-        items.sort(key=lambda r: (r.date, r.start))
+        items.sort(key=lambda r: (r.day_of_week, r.start))
         return items
 
     async def _persist_rules(self, rules_in: List[ScheduleRule]) -> None:

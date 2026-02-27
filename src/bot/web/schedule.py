@@ -37,7 +37,7 @@ async def web_schedule_save(
     
     # Extract lists from form
     ids = form.getlist("id")
-    dates = form.getlist("date")
+    day_of_weeks = form.getlist("day_of_week")
     starts = form.getlist("start")
     ends = form.getlist("end")
     durations = form.getlist("duration")
@@ -47,12 +47,12 @@ async def web_schedule_save(
     deleteds = form.getlist("deleted")
     
     new_rules = []
-    # All fields should have same length, but we use dates as primary driver
-    for i in range(len(dates)):
+    # All fields should have same length, but we use day_of_weeks as primary driver
+    for i in range(len(day_of_weeks)):
         # Construct rule dict; ScheduleRule.model_validate handles conversion
         rule = {
             "id": str(ids[i]) if i < len(ids) and ids[i] else None,
-            "date": str(dates[i]),
+            "day_of_week": int(day_of_weeks[i]),
             "start": str(starts[i]) if i < len(starts) else "",
             "end": str(ends[i]) if i < len(ends) else "",
             "duration": int(durations[i]) if i < len(durations) and durations[i] else 50,

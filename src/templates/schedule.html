@@ -7,7 +7,7 @@
         <i data-lucide="calendar-clock" class="text-primary-600"></i>
         Schedule Rules
       </h1>
-      <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Define availability slots. The bot uses these to offer bookings.</p>
+      <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Define availability slots by days of the week. These rules apply to the future.</p>
     </div>
   </div>
 
@@ -28,7 +28,7 @@
         <table id="rulesTable" class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-50/30 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-700">
-              <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Date</th>
+              <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Day of Week</th>
               <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Start</th>
               <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">End</th>
               <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Dur.</th>
@@ -44,9 +44,16 @@
               <td class="px-4 py-3">
                 <input type="hidden" name="id" value="{{ r.id if r.id is not none else r['id'] }}" />
                 <input type="hidden" name="deleted" value="" class="deleted-flag" />
-                {% set date_val = r.date if r.date is not none else r['date'] %}
-                <input type="hidden" name="date" value="{{ date_val }}" class="date-hidden" />
-                <input type="date" class="date-picker input-field !py-1.5 !px-2 !text-xs !rounded-lg" />
+                {% set dow = r.day_of_week if r.day_of_week is not none else r['day_of_week'] %}
+                <select name="day_of_week" class="input-field !py-1.5 !px-2 !text-xs !rounded-lg">
+                  <option value="0" {% if dow == 0 %}selected{% endif %}>Понедельник</option>
+                  <option value="1" {% if dow == 1 %}selected{% endif %}>Вторник</option>
+                  <option value="2" {% if dow == 2 %}selected{% endif %}>Среда</option>
+                  <option value="3" {% if dow == 3 %}selected{% endif %}>Четверг</option>
+                  <option value="4" {% if dow == 4 %}selected{% endif %}>Пятница</option>
+                  <option value="5" {% if dow == 5 %}selected{% endif %}>Суббота</option>
+                  <option value="6" {% if dow == 6 %}selected{% endif %}>Воскресенье</option>
+                </select>
               </td>
               <td class="px-4 py-3"><input type="time" name="start" value="{{ r.start if r.start is not none else r['start'] }}" required class="input-field !py-1.5 !px-2 !text-xs !rounded-lg" /></td>
               <td class="px-4 py-3"><input type="time" name="end" value="{{ r.end if r.end is not none else r['end'] }}" required class="input-field !py-1.5 !px-2 !text-xs !rounded-lg" /></td>
@@ -107,8 +114,15 @@
       <td class="px-4 py-3">
         <input type="hidden" name="id" value="" />
         <input type="hidden" name="deleted" value="" class="deleted-flag" />
-        <input type="hidden" name="date" value="" class="date-hidden" />
-        <input type="date" class="date-picker input-field !py-1.5 !px-2 !text-xs !rounded-lg" />
+        <select name="day_of_week" class="input-field !py-1.5 !px-2 !text-xs !rounded-lg">
+          <option value="0" selected>Понедельник</option>
+          <option value="1">Вторник</option>
+          <option value="2">Среда</option>
+          <option value="3">Четверг</option>
+          <option value="4">Пятница</option>
+          <option value="5">Суббота</option>
+          <option value="6">Воскресенье</option>
+        </select>
       </td>
       <td class="px-4 py-3"><input type="time" name="start" value="10:00" required class="input-field !py-1.5 !px-2 !text-xs !rounded-lg" /></td>
       <td class="px-4 py-3"><input type="time" name="end" value="18:00" required class="input-field !py-1.5 !px-2 !text-xs !rounded-lg" /></td>
@@ -139,62 +153,11 @@
   </template>
 
   <script>
-    function toIso(dateStr) { // dd-mm-yy -> yyyy-mm-dd
-      if (!dateStr) return "";
-      const m = dateStr.match(/^(\d{2})-(\d{2})-(\d{2})$/);
-      if (!m) return "";
-      const d = m[1], mo = m[2], y2 = m[3];
-      const y4 = Number(y2) + 2000;
-      return `${y4}-${mo}-${d}`;
-    }
-    function toDdMmYy(iso) { // yyyy-mm-dd -> dd-mm-yy
-      if (!iso) return "";
-      const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (!m) return "";
-      const y2 = m[1].slice(-2);
-      return `${m[3]}-${m[2]}-${y2}`;
-    }
-    function initDatePickers(root) {
-      const rows = (root || document).querySelectorAll('tr.rule-row');
-      rows.forEach(tr => {
-        const hidden = tr.querySelector('input.date-hidden');
-        const picker = tr.querySelector('input.date-picker');
-        if (!hidden || !picker) return;
-        // Initialize picker value from hidden dd-mm-yy FIRST
-        let currentIso = "";
-        if (hidden.value) {
-          const iso = toIso(hidden.value);
-          if (iso) {
-            picker.value = iso;
-            currentIso = iso;
-          }
-        }
-        picker.removeAttribute('min');
-        const syncHidden = () => { hidden.value = toDdMmYy(picker.value); };
-        picker.addEventListener('change', syncHidden);
-        picker.addEventListener('input', syncHidden);
-      });
-    }
-    document.addEventListener('DOMContentLoaded', () => {
-      initDatePickers();
-      const form = document.querySelector('form[action="/schedule/save"]');
-      if (form) {
-        form.addEventListener('submit', () => {
-          document.querySelectorAll('tr.rule-row').forEach(tr => {
-            const hidden = tr.querySelector('input.date-hidden');
-            const picker = tr.querySelector('input.date-picker');
-            if (hidden && picker) hidden.value = toDdMmYy(picker.value);
-          });
-        });
-      }
-    });
     function addRule() {
       const tpl = document.getElementById('rowTemplate');
       const tbody = document.querySelector('#rulesTable tbody');
       const node = document.importNode(tpl.content, true);
       tbody.appendChild(node);
-      const lastRow = tbody.querySelector('tr.rule-row:last-child');
-      initDatePickers(lastRow);
       // Re-init lucide icons for new row
       if (window.lucide) lucide.createIcons();
     }
@@ -203,11 +166,6 @@
       if (!tr) return;
       const flag = tr.querySelector('input.deleted-flag');
       if (flag) flag.value = '1';
-      const picker = tr.querySelector('input.date-picker');
-      if (picker) {
-        picker.removeAttribute('min');
-        picker.disabled = true;
-      }
       tr.style.display = 'none';
     }
   </script>

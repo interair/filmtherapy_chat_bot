@@ -40,6 +40,8 @@ RU = {
     "book.no_slots": "На выбранную дату нет доступных слотов.",
     "book.my_title": "Ваши записи:",
     "book.my_none": "У вас нет активных записей.",
+    "book.enter_comment": "Введите сообщение для специалиста (опционально) или нажмите кнопку «Пропустить»:",
+    "book.skip_button": "Пропустить",
 
     "sand.info": "Песочная терапия. Выберите дату и время:",
     "online.info": "Онлайн-сессия. Выберите дату и время:",
@@ -106,6 +108,8 @@ EN = {
     "book.no_slots": "No available slots for the selected date.",
     "book.my_title": "Your bookings:",
     "book.my_none": "You have no bookings.",
+    "book.enter_comment": "Enter a message for the specialist (optional) or press 'Skip':",
+    "book.skip_button": "Skip",
 
     "sand.info": "Sand therapy. Choose date and time:",
     "online.info": "Online session. Choose date and time:",

@@ -44,6 +44,11 @@
                   <div class="flex flex-col">
                     <span class="text-sm font-medium">{{ b.location }}</span>
                     <span class="text-xs text-slate-500">{{ b.session_type }}</span>
+                    {% if b.comment %}
+                      <div class="mt-2 p-2 bg-slate-100/50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 italic">
+                        "{{ b.comment }}"
+                      </div>
+                    {% endif %}
                   </div>
                 </td>
                 <td class="px-6 py-4">

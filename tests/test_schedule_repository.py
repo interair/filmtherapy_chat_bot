@@ -69,9 +69,9 @@ def fake_firestore(monkeypatch):
     return fake
 
 
-def make_rule(date: str, start: str, end: str, duration: int = 50, interval: int | None = None, location: str = "", session_type: str = "") -> ScheduleRule:
+def make_rule(day_of_week: int, start: str, end: str, duration: int = 50, interval: int | None = None, location: str = "", session_type: str = "") -> ScheduleRule:
     return ScheduleRule(
-        date=date,
+        day_of_week=day_of_week,
         start=start,
         end=end,
         duration=duration,
@@ -85,8 +85,8 @@ def make_rule(date: str, start: str, end: str, duration: int = 50, interval: int
 async def test_save_and_get_roundtrip_sorted(fake_firestore):
     repo = ScheduleRepository()
 
-    r1 = make_rule("01-01-30", "10:00", "12:00", duration=60, interval=30, location="LocA", session_type="Онлайн")
-    r2 = make_rule("01-01-30", "09:00", "11:00", duration=45, interval=15, location="LocB", session_type="")
+    r1 = make_rule(0, "10:00", "12:00", duration=60, interval=30, location="LocA", session_type="Онлайн")
+    r2 = make_rule(0, "09:00", "11:00", duration=45, interval=15, location="LocB", session_type="")
 
     # Save two rules
     await repo.save_all([r1, r2])
@@ -100,9 +100,9 @@ async def test_save_and_get_roundtrip_sorted(fake_firestore):
     for doc_id, payload in col._store.items():
         assert "id" not in payload
         assert "deleted" not in payload
-        assert isinstance(payload.get("date"), str)
+        assert isinstance(payload.get("day_of_week"), int)
 
-    # Read back and verify sorting by (date, start)
+    # Read back and verify sorting by (day_of_week, start)
     out = await repo.get_all()
     assert [x.id for x in out] == [r2.id, r1.id]
 
@@ -110,8 +110,8 @@ async def test_save_and_get_roundtrip_sorted(fake_firestore):
 @pytest.mark.asyncio
 async def test_save_deletes_only_when_explicit(fake_firestore):
     repo = ScheduleRepository()
-    r1 = make_rule("02-01-30", "10:00", "12:00")
-    r2 = make_rule("02-01-30", "13:00", "15:00")
+    r1 = make_rule(1, "10:00", "12:00")
+    r2 = make_rule(1, "13:00", "15:00")
     await repo.save_all([r1, r2])
 
     # Saving only a subset should NOT delete others anymore
@@ -120,7 +120,7 @@ async def test_save_deletes_only_when_explicit(fake_firestore):
     assert set(col._store.keys()) == {r1.id, r2.id}
 
     # Now delete r1 explicitly using the deleted flag
-    r1_deleted = make_rule("02-01-30", "10:00", "12:00")
+    r1_deleted = make_rule(1, "10:00", "12:00")
     r1_deleted.deleted = True
     await repo.save_all([r1_deleted])
     assert set(col._store.keys()) == {r2.id}
@@ -129,9 +129,9 @@ async def test_save_deletes_only_when_explicit(fake_firestore):
 @pytest.mark.asyncio
 async def test_save_deduplicates_by_doc_id_last_wins(fake_firestore):
     repo = ScheduleRepository()
-    # Same composite key (date|start|location|session_type), differ by end/duration
-    a = make_rule("03-01-30", "10:00", "11:00", duration=30, location="Room1", session_type="Очно")
-    b = make_rule("03-01-30", "10:00", "12:00", duration=60, location="Room1", session_type="Очно")
+    # Same composite key (day_of_week|start|location|session_type), differ by end/duration
+    a = make_rule(3, "10:00", "11:00", duration=30, location="Room1", session_type="Очно")
+    b = make_rule(3, "10:00", "12:00", duration=60, location="Room1", session_type="Очно")
     assert a.id == b.id  # sanity: composite keys match
 
     await repo.save_all([a, b])
@@ -146,7 +146,7 @@ async def test_save_deduplicates_by_doc_id_last_wins(fake_firestore):
 @pytest.mark.asyncio
 async def test_save_ignores_invalid_items(fake_firestore):
     repo = ScheduleRepository()
-    valid = make_rule("04-01-30", "10:00", "11:00")
+    valid = make_rule(4, "10:00", "11:00")
     # Include non-rule garbage; repository should ignore invalid items without raising
     await repo.save_all([valid, "oops", 123])  # type: ignore[list-item]
 

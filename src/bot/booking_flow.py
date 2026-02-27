@@ -23,6 +23,7 @@ class BookingData:
     location: Optional[str] = None
     date: Optional[str] = None  # dd-mm-yy (user-facing)
     time: Optional[datetime] = None
+    comment: Optional[str] = None
 
 
 class BookingFlow:
@@ -60,6 +61,7 @@ class BookingFlow:
             slot=slot,
             name=user_name,
             phone=None,
+            comment=booking_data.comment,
         )
         return booking
 
