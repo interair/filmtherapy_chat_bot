@@ -756,7 +756,7 @@ async def web_about(
     cfg = await about_repo.get()
     fn = cfg.get("photo") if isinstance(cfg, dict) else None
     photo = fn if isinstance(fn, str) and fn else ""
-    cinema_photos = about_repo.list_cinema_photos()
+    cinema_photos = await about_repo.list_cinema_photos()
     return templates.TemplateResponse("about.html", {
         "request": request,
         "saved": saved,
@@ -833,7 +833,7 @@ async def web_about_cinema_delete(
     _: None = Depends(verify_web_auth),
 ):
     # Basic sanitization: only allow filenames we know in repository
-    items = set(about_repo.list_cinema_photos())
+    items = set(await about_repo.list_cinema_photos())
     if name in items:
         try:
             await about_repo.delete_cinema_photo(name)
