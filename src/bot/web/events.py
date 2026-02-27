@@ -18,16 +18,25 @@ router = APIRouter(prefix="/events", tags=["events"], dependencies=[Depends(veri
 @router.get("")
 async def web_events(
     request: Request,
+    show_past: bool = False,
     event_service: EventService = Depends(get_event_service),
     reg_repo = Depends(get_event_registration_repository),
 ):
-    events = await event_service.list_upcoming_events()
+    if show_past:
+        events = await event_service.list_past_events()
+    else:
+        events = await event_service.list_upcoming_events()
+        
     attendees = {}
     for ev in events:
         regs = await reg_repo.get_by_event(ev.id)
         attendees[ev.id] = regs
     
-    return render(request, "events.html", {"poster": events, "attendees": attendees})
+    return render(request, "events.html", {
+        "poster": events, 
+        "attendees": attendees,
+        "show_past": show_past
+    })
 
 @router.get("/add")
 async def web_events_add(request: Request, loc_repo: LocationRepository = Depends(get_location_service)):

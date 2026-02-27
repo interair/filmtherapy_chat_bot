@@ -192,6 +192,20 @@ class EventRepository(FirestoreRepository[Event]):
         logger.info("EventRepository: get_upcoming returning %d events", len(items))
         return items
 
+    async def get_past(self) -> List[Event]:
+        now = datetime.now(timezone.utc)
+        items: List[Event] = []
+        # Query for events in the past, ordered by date descending (most recent first)
+        query = self._col.where(filter=FieldFilter("when", "<", now)).order_by("when", direction="DESCENDING").limit(100)
+        async for doc in query.stream():
+            try:
+                model = self._to_model(doc.id, doc.to_dict() or {})
+                items.append(model)
+            except Exception as e:
+                logger.error("Failed to validate past event doc_id=%s: %s", doc.id, e, exc_info=True)
+        logger.info("EventRepository: get_past returning %d events", len(items))
+        return items
+
 
 class LocationRepository(FirestoreRepository[Location]):
     """Firestore-backed repository for locations. Uses Location.name as doc id."""

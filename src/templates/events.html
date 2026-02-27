@@ -7,9 +7,24 @@
         <i data-lucide="clapperboard" class="text-primary-600"></i>
         Event Management
       </h1>
-      <p class="text-slate-500 dark:text-slate-400 mt-1">Manage public events shown to your users.</p>
+      <p class="text-slate-500 dark:text-slate-400 mt-1">
+        {% if show_past %}
+          Archive of past events.
+        {% else %}
+          Manage public events shown to your users.
+        {% endif %}
+      </p>
     </div>
     <div class="flex items-center gap-3">
+      {% if show_past %}
+        <a href="/events" class="btn bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border-none">
+          <i data-lucide="calendar" class="w-4 h-4"></i> Show Upcoming
+        </a>
+      {% else %}
+        <a href="/events?show_past=true" class="btn bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border-none">
+          <i data-lucide="history" class="w-4 h-4"></i> Show Past
+        </a>
+      {% endif %}
       <a href="/events/add" class="btn btn-primary">
         <i data-lucide="plus" class="w-4 h-4"></i> Add New Event
       </a>
@@ -126,11 +141,25 @@
         <div class="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 mb-4">
           <i data-lucide="calendar-x" class="w-10 h-10"></i>
         </div>
-        <h3 class="text-xl font-bold mb-2">No events found</h3>
-        <p class="text-slate-500 dark:text-slate-400 max-w-xs mb-6">You haven't created any events yet. Start by adding your first event to the poster.</p>
-        <a href="/events/add" class="btn btn-primary">
-          <i data-lucide="plus" class="w-4 h-4"></i> Create First Event
-        </a>
+        <h3 class="text-xl font-bold mb-2">
+          {% if show_past %}
+            No past events found
+          {% else %}
+            No events found
+          {% endif %}
+        </h3>
+        <p class="text-slate-500 dark:text-slate-400 max-w-xs mb-6">
+          {% if show_past %}
+            The archive is empty.
+          {% else %}
+            You haven't created any events yet. Start by adding your first event to the poster.
+          {% endif %}
+        </p>
+        {% if not show_past %}
+          <a href="/events/add" class="btn btn-primary">
+            <i data-lucide="plus" class="w-4 h-4"></i> Create First Event
+          </a>
+        {% endif %}
       </div>
     {% endif %}
   </div>

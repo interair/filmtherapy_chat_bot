@@ -37,6 +37,11 @@ class EventService:
         logger.info("EventService: list_upcoming_events count=%d", len(events))
         return events
 
+    async def list_past_events(self) -> List[Event]:
+        events = await self._repo.get_past()
+        logger.info("EventService: list_past_events count=%d", len(events))
+        return events
+
     async def create_event(
         self,
         dto: EventCreate,
