@@ -1,51 +1,85 @@
 {% extends "base.html" %}
 {% block title %}Locations by Type{% endblock %}
 {% block content %}
-  <h1>📍 Locations by Type</h1>
-  <a href="/" class="button">← Back</a>
-  <a href="/locations" class="button outline" style="margin-left:8px">All locations…</a>
-  {% if saved %}<div class="alert">✓ Сохранено</div>{% endif %}
-  {% if deleted %}<div class="alert">✓ Удалено</div>{% endif %}
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div>
+      <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+        <i data-lucide="git-branch" class="text-primary-600"></i>
+        Locations by Type
+      </h1>
+      <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Map session types to allowed locations.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/locations" class="btn btn-secondary">
+        <i data-lucide="map-pin" class="w-4 h-4"></i> All locations
+      </a>
+    </div>
+  </div>
 
-  <div class="card">
-    <h3>Add mapping</h3>
-    <form method="post" action="/locations/types/add">
-      <div style="display:flex; gap:12px; flex-wrap: wrap; align-items: center;">
-        <select name="type" required style="min-width:260px">
+  {% if saved %}
+    <div class="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-3 text-emerald-800 dark:text-emerald-200">
+      <i data-lucide="check-circle" class="w-5 h-5"></i>
+      <span class="font-medium">Сохранено</span>
+    </div>
+  {% endif %}
+  {% if deleted %}
+    <div class="mb-6 p-4 rounded-2xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 flex items-center gap-3 text-rose-800 dark:text-rose-200">
+      <i data-lucide="trash-2" class="w-5 h-5"></i>
+      <span class="font-medium">Удалено</span>
+    </div>
+  {% endif %}
+
+  <div class="card p-8">
+    <h3 class="text-xl font-bold mb-4">Add mapping</h3>
+    <form method="post" action="/locations/types/add" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Session Type</label>
+        <select name="type" required class="input-field">
           {% for st in session_types %}
             <option value="{{ st }}">{{ st }}</option>
           {% endfor %}
         </select>
-        <select name="name" required style="min-width:260px">
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Location</label>
+        <select name="name" required class="input-field">
           <option value="" disabled selected>Select location</option>
           {% for loc in all_locations %}
             <option value="{{ loc }}">{{ loc }}</option>
           {% endfor %}
         </select>
-        <button type="submit" class="button">➕ Add</button>
+      </div>
+      <div>
+        <button type="submit" class="btn btn-primary w-full md:w-auto">
+          <i data-lucide="plus" class="w-4 h-4"></i> Add
+        </button>
       </div>
     </form>
   </div>
 
   {% if items and items|length > 0 %}
-    {% for group in items %}
-      <div class="card">
-        <h3 style="margin-bottom:8px">{{ group.type }}</h3>
-        {% if group.locs and group.locs|length > 0 %}
-          <ul style="list-style:none; padding-left:0;">
-            {% for it in group.locs %}
-              <li style="margin:6px 0">
-                {{ it.name }}
-                <a class="button danger" style="padding:2px 8px;font-size:12px" href="/locations/types/delete/{{ group.type_enc }}/{{ it.enc }}" onclick="return confirm('Удалить связь?')">🗑️</a>
-              </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <p class="muted">No locations yet</p>
-        {% endif %}
-      </div>
-    {% endfor %}
+    <div class="space-y-6 mt-6">
+      {% for group in items %}
+        <div class="card p-6">
+          <h3 class="text-lg font-bold mb-4">{{ group.type }}</h3>
+          {% if group.locs and group.locs|length > 0 %}
+            <ul class="divide-y divide-slate-200 dark:divide-slate-700">
+              {% for it in group.locs %}
+                <li class="py-3 flex items-center justify-between">
+                  <span class="font-medium">{{ it.name }}</span>
+                  <a class="p-2 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors" href="/locations/types/delete/{{ group.type_enc }}/{{ it.enc }}" onclick="return confirm('Удалить связь?')" title="Delete">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-slate-500 dark:text-slate-400">No locations yet</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
   {% else %}
-    <div class="card"><em>Нет настроек — добавьте первую связь</em></div>
+    <div class="card p-8 mt-6 text-slate-500 dark:text-slate-400"><em>Нет настроек — добавьте первую связь</em></div>
   {% endif %}
 {% endblock %}

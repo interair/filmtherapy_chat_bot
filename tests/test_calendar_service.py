@@ -38,7 +38,7 @@ class FakeBookingsRepo:
         return b
 
     # Methods used by CalendarService
-    def get_for_date_sync(self, date: datetime) -> list[dict]:
+    async def get_for_date(self, date: datetime) -> list[dict]:
         if date.tzinfo is None:
             date = date.replace(tzinfo=timezone.utc)
         start_of_day = date.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -55,7 +55,7 @@ class FakeBookingsRepo:
         items.sort(key=lambda x: x["start"])
         return items
 
-    def get_range_sync(self, start: datetime, end: datetime) -> list[dict]:
+    async def get_range(self, start: datetime, end: datetime) -> list[dict]:
         if start.tzinfo is None:
             start = start.replace(tzinfo=timezone.utc)
         if end.tzinfo is None:
@@ -71,11 +71,11 @@ class FakeBookingsRepo:
         items.sort(key=lambda x: x["start"])
         return items
 
-    def set_sync(self, booking: dict) -> dict:
+    async def set_raw(self, booking: dict) -> dict:
         self.store[str(booking["id"])] = dict(booking)
         return booking
 
-    def patch_sync(self, id: str, fields: dict) -> dict | None:
+    async def patch_raw(self, id: str, fields: dict) -> dict | None:
         cur = self.store.get(str(id))
         if not cur:
             return None
@@ -83,20 +83,20 @@ class FakeBookingsRepo:
         self.store[str(id)] = cur
         return dict(cur)
 
-    def get_by_user_sync(self, user_id: int | str) -> list[dict]:
+    async def get_by_user(self, user_id: int | str) -> list[dict]:
         uid = str(user_id)
         out = [dict(b) for b in self.store.values() if str(b.get("user_id")) == uid]
         out.sort(key=lambda x: x.get("start", ""))
         return out
 
-    def get_all_sync(self) -> list[dict]:
+    async def get_all_raw(self) -> list[dict]:
         return [dict(b) for b in self.store.values()]
 
-    def get_by_id_sync(self, id: str) -> dict | None:
+    async def get_by_id_raw(self, id: str) -> dict | None:
         b = self.store.get(str(id))
         return dict(b) if b else None
 
-    def delete_sync(self, id: str) -> bool:
+    async def delete_raw(self, id: str) -> bool:
         return self.store.pop(str(id), None) is not None
 
 
@@ -104,7 +104,7 @@ class FakeScheduleRepo:
     def __init__(self, rules: list[dict] | None = None):
         self.rules = rules or []
 
-    def get_sync(self):
+    async def get(self):
         # CalendarService now expects a typed list of ScheduleRule
         from src.services.models import ScheduleRule
         out: list[ScheduleRule] = []
@@ -168,13 +168,14 @@ def test_parse_hhmm_and_normalize_and_overlaps():
 
 
 # ---------------------- list_available_slots tests ----------------------
-def test_list_available_slots_offline_specific_location(service: CalendarService, repos):
+@pytest.mark.asyncio
+async def test_list_available_slots_offline_specific_location(service: CalendarService, repos):
     # Rule for 01-01-50, 10:00-12:00, 60-min slots at exact location
     date = datetime(2050, 1, 1, tzinfo=timezone.utc)
     rule = {"date": "01-01-50", "start": "10:00", "end": "12:00", "duration": 60, "interval": 60, "location": "IJsbaanpad 9", "session_type": "Очно"}
     repos.schedule.rules = [rule]
 
-    slots = service.list_available_slots(date, location="IJsbaanpad 9", session_type="Очно")
+    slots = await service.list_available_slots(date, location="IJsbaanpad 9", session_type="Очно")
 
     assert len(slots) == 2
     assert [s.start.hour for s in slots] == [10, 11]
@@ -183,32 +184,35 @@ def test_list_available_slots_offline_specific_location(service: CalendarService
     assert slots[0].start < slots[1].start
 
 
-def test_list_available_slots_any_location_uses_selected(service: CalendarService, repos):
+@pytest.mark.asyncio
+async def test_list_available_slots_any_location_uses_selected(service: CalendarService, repos):
     date = datetime(2050, 1, 1, tzinfo=timezone.utc)
     rule = {"date": "01-01-50", "start": "10:00", "end": "12:00", "duration": 60, "interval": 60, "location": "any", "session_type": "Очно"}
     repos.schedule.rules = [rule]
 
-    slots = service.list_available_slots(date, location="Van Eeghenlaan 27", session_type="Очно")
+    slots = await service.list_available_slots(date, location="Van Eeghenlaan 27", session_type="Очно")
     assert len(slots) == 2
     assert all(s.location == "Van Eeghenlaan 27" for s in slots)
 
 
-def test_list_available_slots_online_only_rule(service: CalendarService, repos):
+@pytest.mark.asyncio
+async def test_list_available_slots_online_only_rule(service: CalendarService, repos):
     date = datetime(2050, 1, 1, tzinfo=timezone.utc)
     rule = {"date": "01-01-50", "start": "09:00", "end": "10:00", "duration": 30, "interval": 30, "location": "Онлайн", "session_type": "Онлайн"}
     repos.schedule.rules = [rule]
 
     # Online selection matches
-    online_slots = service.list_available_slots(date, location=None, session_type="Онлайн")
+    online_slots = await service.list_available_slots(date, location=None, session_type="Онлайн")
     assert len(online_slots) == 2
     assert all(s.location is None for s in online_slots)
 
     # Offline selection should not match this rule
-    offline_slots = service.list_available_slots(date, location="IJsbaanpad 9", session_type="Очно")
+    offline_slots = await service.list_available_slots(date, location="IJsbaanpad 9", session_type="Очно")
     assert offline_slots == []
 
 
-def test_list_available_slots_excludes_busy_intervals(service: CalendarService, repos):
+@pytest.mark.asyncio
+async def test_list_available_slots_excludes_busy_intervals(service: CalendarService, repos):
     date = datetime(2050, 1, 1, tzinfo=timezone.utc)
     rule = {"date": "01-01-50", "start": "10:00", "end": "12:00", "duration": 60, "interval": 60, "location": "IJsbaanpad 9", "session_type": "Очно"}
     repos.schedule.rules = [rule]
@@ -218,7 +222,7 @@ def test_list_available_slots_excludes_busy_intervals(service: CalendarService, 
     end_busy = datetime(2050, 1, 1, 11, 0, tzinfo=timezone.utc)
     repos.bookings.add_booking(id="b1", user_id=1, start=start_busy, end=end_busy, location="IJsbaanpad 9", session_type="Очно")
 
-    slots = service.list_available_slots(date, location="IJsbaanpad 9", session_type="Очно")
+    slots = await service.list_available_slots(date, location="IJsbaanpad 9", session_type="Очно")
     assert len(slots) == 1
     assert slots[0].start.hour == 11
 
@@ -230,20 +234,22 @@ def make_slot(start: datetime, end: datetime, location: str | None, session_type
     return Slot(id=slot_id, start=start, end=end, location=location, session_type=session_type)
 
 
-def test_create_reservation_success_and_persist(service: CalendarService, repos):
+@pytest.mark.asyncio
+async def test_create_reservation_success_and_persist(service: CalendarService, repos):
     start = datetime(2050, 1, 2, 10, 0, tzinfo=timezone.utc)
     end = start + timedelta(minutes=60)
     slot = make_slot(start, end, location="IJsbaanpad 9", session_type="Очно")
 
-    booking = service.create_reservation(user_id=42, slot=slot, name="John", phone="123")
+    booking = await service.create_reservation(user_id=42, slot=slot, name="John", phone="123")
 
     assert booking["status"] == "pending_payment"
     assert booking["user_id"] == "42"
     assert booking["start"].endswith("Z")
-    assert repos.bookings.get_by_id_sync(booking["id"]) is not None
+    assert await repos.bookings.get_by_id_raw(booking["id"]) is not None
 
 
-def test_create_reservation_conflict_raises(service: CalendarService, repos):
+@pytest.mark.asyncio
+async def test_create_reservation_conflict_raises(service: CalendarService, repos):
     # Existing booking starting inside the desired slot window
     busy_start = datetime(2050, 1, 3, 10, 15, tzinfo=timezone.utc)
     busy_end = busy_start + timedelta(minutes=60)
@@ -254,60 +260,63 @@ def test_create_reservation_conflict_raises(service: CalendarService, repos):
     slot = make_slot(slot_start, slot_end, location="IJsbaanpad 9", session_type="Очно")
 
     with pytest.raises(ValidationError):
-        service.create_reservation(user_id=2, slot=slot, name="A", phone=None)
+        await service.create_reservation(user_id=2, slot=slot, name="A", phone=None)
 
 
-def test_confirm_payment_updates_status_and_missing_id(service: CalendarService, repos):
+@pytest.mark.asyncio
+async def test_confirm_payment_updates_status_and_missing_id(service: CalendarService, repos):
     # Create booking first
     start = datetime(2050, 1, 4, 9, 0, tzinfo=timezone.utc)
     end = start + timedelta(minutes=60)
     slot = make_slot(start, end, location=None, session_type="Онлайн")
-    created = service.create_reservation(user_id=7, slot=slot, name="N", phone=None)
+    created = await service.create_reservation(user_id=7, slot=slot, name="N", phone=None)
 
-    updated = service.confirm_payment(created["id"])
+    updated = await service.confirm_payment(created["id"])
     assert updated["status"] == "confirmed"
 
     # Missing id should raise KeyError per service contract
     with pytest.raises(KeyError):
-        service.confirm_payment("nope")
+        await service.confirm_payment("nope")
 
 
-def test_list_user_and_all_bookings(service: CalendarService, repos):
+@pytest.mark.asyncio
+async def test_list_user_and_all_bookings(service: CalendarService, repos):
     # Seed two users
     base = datetime(2050, 1, 5, tzinfo=timezone.utc)
     repos.bookings.add_booking(id="b1", user_id=1, start=base, end=base + timedelta(minutes=50), location="IJsbaanpad 9", session_type="Очно")
     repos.bookings.add_booking(id="b2", user_id=2, start=base + timedelta(hours=1), end=base + timedelta(hours=2), location=None, session_type="Онлайн")
 
-    u1 = service.list_user_bookings(1)
+    u1 = await service.list_user_bookings(1)
     assert len(u1) == 1 and u1[0]["id"] == "b1"
 
-    all_b = service.list_all_bookings()
+    all_b = await service.list_all_bookings()
     ids = {b["id"] for b in all_b}
     assert {"b1", "b2"} <= ids
 
 
-def test_cancel_booking_rules_and_admin_delete(service: CalendarService, repos):
+@pytest.mark.asyncio
+async def test_cancel_booking_rules_and_admin_delete(service: CalendarService, repos):
     now = datetime.now(timezone.utc)
 
     # Far in the future: cancel should succeed
     far_start = now + timedelta(days=3)
     repos.bookings.add_booking(id="c1", user_id=1, start=far_start, end=far_start + timedelta(minutes=50), location=None, session_type="Онлайн")
-    out = service.cancel_booking("c1")
+    out = await service.cancel_booking("c1")
     assert out["id"] == "c1" and out["status"] == "canceled"
-    assert repos.bookings.get_by_id_sync("c1") is None
+    assert await repos.bookings.get_by_id_raw("c1") is None
 
     # Less than 24h: should raise PermissionError
     soon_start = now + timedelta(hours=1)
     repos.bookings.add_booking(id="c2", user_id=1, start=soon_start, end=soon_start + timedelta(minutes=50), location="IJsbaanpad 9", session_type="Очно")
     with pytest.raises(PermissionError):
-        service.cancel_booking("c2")
+        await service.cancel_booking("c2")
 
     # Missing id: KeyError
     with pytest.raises(KeyError):
-        service.cancel_booking("missing")
+        await service.cancel_booking("missing")
 
     # Admin delete ignores 24h rule
     repos.bookings.add_booking(id="adm", user_id=1, start=soon_start, end=soon_start + timedelta(minutes=50), location="IJsbaanpad 9", session_type="Очно")
-    out2 = service.admin_delete_booking("adm")
+    out2 = await service.admin_delete_booking("adm")
     assert out2["id"] == "adm" and out2["status"] == "deleted"
-    assert repos.bookings.get_by_id_sync("adm") is None
+    assert await repos.bookings.get_by_id_raw("adm") is None

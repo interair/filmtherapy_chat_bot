@@ -1,30 +1,88 @@
 {% extends "base.html" %}
 {% block title %}Bookings{% endblock %}
 {% block content %}
-  <h1>📅 Bookings</h1>
-  <a href="/" class="button" title="Return to main dashboard">← Back to Admin</a>
-  {% if deleted %}<div class="alert">✓ Booking deleted</div>{% endif %}
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div>
+      <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+        <i data-lucide="clipboard-list" class="text-primary-600"></i>
+        Bookings
+      </h1>
+      <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Review and manage user registrations for sessions.</p>
+    </div>
+  </div>
 
-  <div class="card">
-    <h2>Current Bookings</h2>
-    <p class="muted">This page lists all user registrations. Use it to check attendance and resolve scheduling questions.</p>
+  {% if deleted %}
+    <div class="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-3 text-emerald-800 dark:text-emerald-200">
+      <i data-lucide="check-circle" class="w-5 h-5"></i>
+      <span class="font-medium">Booking deleted successfully.</span>
+    </div>
+  {% endif %}
+
+  <div class="card overflow-hidden">
     {% if items %}
-      {% for b in items %}
-        <div class="event-item" title="Booking details">
-          <h4>{{ b.location }} - {{ b.session_type }}</h4>
-          <p><strong>User:</strong> {{ b.user_name }} <small>(ID: {{ b.user_id }})</small></p>
-          <p><strong>Date:</strong> {{ b.date_str }}</p>
-          <p><strong>Time:</strong> {{ b.time_str }}</p>
-          <p><strong>Status:</strong> <span class="status-{{ b.status_color }}" title="Current booking status">{{ b.status }}</span></p>
-          <p><strong>Created:</strong> {{ b.created_at }}</p>
-          <form method="post" action="/bookings/delete" style="margin-top:8px;">
-            <input type="hidden" name="id" value="{{ b.id }}" />
-            <button type="submit" class="button danger" title="Delete booking permanently">🗑️ Delete</button>
-          </form>
-        </div>
-      {% endfor %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+              <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">User</th>
+              <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Session</th>
+              <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Date & Time</th>
+              <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Status</th>
+              <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+            {% for b in items %}
+              <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                <td class="px-6 py-4">
+                  <div class="flex flex-col">
+                    <span class="font-semibold text-slate-900 dark:text-white">{{ b.user_name }}</span>
+                    <span class="text-xs text-slate-500">ID: {{ b.user_id }}</span>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex flex-col">
+                    <span class="text-sm font-medium">{{ b.location }}</span>
+                    <span class="text-xs text-slate-500">{{ b.session_type }}</span>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex flex-col text-sm">
+                    <span class="font-medium">{{ b.date_str }}</span>
+                    <span class="text-slate-500">{{ b.time_str }}</span>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  {% if b.status_color == 'green' %}
+                    <span class="badge bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                      {{ b.status }}
+                    </span>
+                  {% else %}
+                    <span class="badge bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                      {{ b.status }}
+                    </span>
+                  {% endif %}
+                </td>
+                <td class="px-6 py-4">
+                  <form method="post" action="/bookings/delete" onsubmit="return confirm('Permanently delete this booking?')">
+                    <input type="hidden" name="id" value="{{ b.id }}" />
+                    <button type="submit" class="p-2 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors" title="Delete booking">
+                      <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     {% else %}
-      <p>No bookings found.</p>
+      <div class="p-12 text-center">
+        <div class="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 mx-auto mb-4">
+          <i data-lucide="inbox" class="w-8 h-8"></i>
+        </div>
+        <p class="text-slate-500 dark:text-slate-400">No bookings found.</p>
+      </div>
     {% endif %}
   </div>
 {% endblock %}

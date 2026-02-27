@@ -5,7 +5,7 @@ from typing import Any, Callable, Optional
 
 from google.cloud import firestore
 
-from .firestore_client import get_client
+from .firestore_client import get_async_client
 
 logger = logging.getLogger(__name__)
 
@@ -17,23 +17,23 @@ class DB:
     """
 
     def __init__(self, project_id: Optional[str] = None) -> None:
-        self._client = get_client(project_id)
+        self._client = get_async_client(project_id)
 
     # Shortcuts
-    def collection(self, name: str) -> firestore.CollectionReference:
+    def collection(self, name: str) -> firestore.AsyncCollectionReference:
         return self._client.collection(name)
 
     @property
-    def client(self) -> firestore.Client:
+    def client(self) -> firestore.AsyncClient:
         return self._client
 
     # Transactions
-    def run_transaction(self, func: Callable[[firestore.Transaction], Any]) -> Any:
+    async def run_transaction(self, func: Callable[[firestore.AsyncTransaction], Any]) -> Any:
         tx = self._client.transaction()
         # Use context manager API compatible with google-cloud-firestore v2+
         try:
-            with tx:
-                return func(tx)
+            async with tx:
+                return await func(tx)
         except Exception:
             logger.exception("Firestore transaction failed")
             # Context manager will handle rollback automatically where applicable

@@ -1,111 +1,140 @@
 {% extends "base.html" %}
 {% block title %}Schedule Settings{% endblock %}
 {% block content %}
-  <h1>🗓️ Schedule</h1>
-  <a href="/" class="button">← Back</a>
-  {% if saved %}<div class="alert">✓ Schedule saved</div>{% endif %}
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div>
+      <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+        <i data-lucide="calendar-clock" class="text-primary-600"></i>
+        Schedule Rules
+      </h1>
+      <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Define availability slots. The bot uses these to offer bookings.</p>
+    </div>
+  </div>
 
-  <div class="card">
+  {% if saved %}
+    <div class="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-3 text-emerald-800 dark:text-emerald-200 animate-in fade-in duration-300">
+      <i data-lucide="check-circle" class="w-5 h-5"></i>
+      <span class="font-medium">Schedule rules updated successfully!</span>
+    </div>
+  {% endif %}
+
+  <div class="card overflow-hidden">
     <form method="post" action="/schedule/save">
-      <p class="muted">Define availability for specific dates (dd-mm-yy). The bot will offer slots based on these rules and existing bookings.</p>
+      <div class="p-6 bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-700">
+        <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Configuration</p>
+      </div>
+      
+      <div class="overflow-x-auto">
+        <table id="rulesTable" class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50/30 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-700">
+              <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Date</th>
+              <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Start</th>
+              <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">End</th>
+              <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Dur.</th>
+              <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Int.</th>
+              <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Location</th>
+              <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Type</th>
+              <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500 w-12"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50">
+          {% for r in rules %}
+            <tr class="rule-row group hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+              <td class="px-4 py-3">
+                <input type="hidden" name="id" value="{{ r.id if r.id is not none else r['id'] }}" />
+                <input type="hidden" name="deleted" value="" class="deleted-flag" />
+                {% set date_val = r.date if r.date is not none else r['date'] %}
+                <input type="hidden" name="date" value="{{ date_val }}" class="date-hidden" />
+                <input type="date" class="date-picker input-field !py-1.5 !px-2 !text-xs !rounded-lg" />
+              </td>
+              <td class="px-4 py-3"><input type="time" name="start" value="{{ r.start if r.start is not none else r['start'] }}" required class="input-field !py-1.5 !px-2 !text-xs !rounded-lg" /></td>
+              <td class="px-4 py-3"><input type="time" name="end" value="{{ r.end if r.end is not none else r['end'] }}" required class="input-field !py-1.5 !px-2 !text-xs !rounded-lg" /></td>
+              <td class="px-4 py-3"><input type="number" name="duration" min="15" step="5" value="{{ r.duration if r.duration is not none else r['duration'] }}" class="input-field !py-1.5 !px-2 !text-xs !rounded-lg w-16" /></td>
+              <td class="px-4 py-3"><input type="number" name="interval" min="15" step="5" value="{{ r.interval if r.interval is not none else r['interval'] }}" class="input-field !py-1.5 !px-2 !text-xs !rounded-lg w-16" /></td>
+              <td class="px-4 py-3">
+                {% set loc_val = r.location if r.location is not none else r['location'] %}
+                <select name="location" class="input-field !py-1.5 !px-2 !text-xs !rounded-lg">
+                  <option value="" {% if not loc_val %}selected{% endif %}>— Any —</option>
+                  {% for loc in locations %}
+                    <option value="{{ loc }}" {% if loc_val == loc %}selected{% endif %}>{{ loc }}</option>
+                  {% endfor %}
+                  {% if loc_val and loc_val not in locations %}
+                    <option value="{{ loc_val }}" selected>{{ loc_val }}</option>
+                  {% endif %}
+                </select>
+              </td>
+              <td class="px-4 py-3">
+                {% set sess_val = r.session_type if r.session_type is not none else r['session_type'] %}
+                <select name="session_type" class="input-field !py-1.5 !px-2 !text-xs !rounded-lg">
+                  <option value="" {% if not sess_val %}selected{% endif %}>— Any —</option>
+                  {% for st in session_types %}
+                    <option value="{{ st }}" {% if sess_val == st %}selected{% endif %}>{{ st }}</option>
+                  {% endfor %}
+                  {% if sess_val and sess_val not in session_types %}
+                    <option value="{{ sess_val }}" selected>{{ sess_val }}</option>
+                  {% endif %}
+                </select>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <button type="button" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100" onclick="removeRow(this)">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
 
-      <table id="rulesTable">
-        <thead>
-          <tr>
-            <th style="width: 140px;">Date (dd-mm-yy)</th>
-            <th style="width: 110px;">Start</th>
-            <th style="width: 110px;">End</th>
-            <th style="width: 110px;">Duration</th>
-            <th style="width: 110px;">Interval</th>
-            <th>Location</th>
-            <th>Session type</th>
-            <th style="width: 60px;"></th>
-          </tr>
-        </thead>
-        <tbody>
-        {% for r in rules %}
-          <tr class="rule-row">
-            <td>
-              <input type="hidden" name="id" value="{{ r.id if r.id is not none else r['id'] }}" />
-              <input type="hidden" name="deleted" value="" class="deleted-flag" />
-              {% set date_val = r.date if r.date is not none else r['date'] %}
-              <input type="hidden" name="date" value="{{ date_val }}" class="date-hidden" />
-              <input type="date" class="date-picker" />
-            </td>
-            <td><input type="time" name="start" value="{{ r.start if r.start is not none else r['start'] }}" required /></td>
-            <td><input type="time" name="end" value="{{ r.end if r.end is not none else r['end'] }}" required /></td>
-            <td><input type="number" name="duration" min="15" step="5" value="{{ r.duration if r.duration is not none else r['duration'] }}" /></td>
-            <td><input type="number" name="interval" min="15" step="5" value="{{ r.interval if r.interval is not none else r['interval'] }}" /></td>
-            <td>
-              {% set loc_val = r.location if r.location is not none else r['location'] %}
-              <select name="location">
-                <option value="" {% if not loc_val %}selected{% endif %}>— Any —</option>
-                {% for loc in locations %}
-                  <option value="{{ loc }}" {% if loc_val == loc %}selected{% endif %}>{{ loc }}</option>
-                {% endfor %}
-                {% if loc_val and loc_val not in locations %}
-                  <option value="{{ loc_val }}" selected>{{ loc_val }}</option>
-                {% endif %}
-              </select>
-            </td>
-            <td>
-              {% set sess_val = r.session_type if r.session_type is not none else r['session_type'] %}
-              <select name="session_type">
-                <option value="" {% if not sess_val %}selected{% endif %}>— Any —</option>
-                {% for st in session_types %}
-                  <option value="{{ st }}" {% if sess_val == st %}selected{% endif %}>{{ st }}</option>
-                {% endfor %}
-                {% if sess_val and sess_val not in session_types %}
-                  <option value="{{ sess_val }}" selected>{{ sess_val }}</option>
-                {% endif %}
-              </select>
-            </td>
-            <td><button type="button" class="button danger" onclick="removeRow(this)">✕</button></td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-
-      <p>
-        <button type="button" class="button" onclick="addRule()">➕ Add rule</button>
-      </p>
-
-      <p>
-        <button type="submit" class="button success">💾 Save</button>
-        <a href="/" class="button">Cancel</a>
-      </p>
+      <div class="p-6 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col md:flex-row items-center justify-between gap-4 border-t border-slate-200 dark:border-slate-700">
+        <button type="button" class="btn btn-secondary w-full md:w-auto" onclick="addRule()">
+          <i data-lucide="plus" class="w-4 h-4"></i> Add New Rule
+        </button>
+        
+        <div class="flex items-center gap-3 w-full md:w-auto">
+          <a href="/" class="btn btn-secondary flex-grow md:flex-grow-0">Cancel</a>
+          <button type="submit" class="btn btn-primary flex-grow md:flex-grow-0">
+            <i data-lucide="save" class="w-4 h-4"></i> Save Changes
+          </button>
+        </div>
+      </div>
     </form>
   </div>
 
   <template id="rowTemplate">
-    <tr class="rule-row">
-      <td>
+    <tr class="rule-row group hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+      <td class="px-4 py-3">
         <input type="hidden" name="id" value="" />
         <input type="hidden" name="deleted" value="" class="deleted-flag" />
         <input type="hidden" name="date" value="" class="date-hidden" />
-        <input type="date" class="date-picker" />
+        <input type="date" class="date-picker input-field !py-1.5 !px-2 !text-xs !rounded-lg" />
       </td>
-      <td><input type="time" name="start" value="10:00" required /></td>
-      <td><input type="time" name="end" value="18:00" required /></td>
-      <td><input type="number" name="duration" min="15" step="5" value="60" /></td>
-      <td><input type="number" name="interval" min="15" step="5" value="30" /></td>
-      <td>
-        <select name="location">
+      <td class="px-4 py-3"><input type="time" name="start" value="10:00" required class="input-field !py-1.5 !px-2 !text-xs !rounded-lg" /></td>
+      <td class="px-4 py-3"><input type="time" name="end" value="18:00" required class="input-field !py-1.5 !px-2 !text-xs !rounded-lg" /></td>
+      <td class="px-4 py-3"><input type="number" name="duration" min="15" step="5" value="60" class="input-field !py-1.5 !px-2 !text-xs !rounded-lg w-16" /></td>
+      <td class="px-4 py-3"><input type="number" name="interval" min="15" step="5" value="30" class="input-field !py-1.5 !px-2 !text-xs !rounded-lg w-16" /></td>
+      <td class="px-4 py-3">
+        <select name="location" class="input-field !py-1.5 !px-2 !text-xs !rounded-lg">
           <option value="" selected>— Any —</option>
           {% for loc in locations %}
             <option value="{{ loc }}">{{ loc }}</option>
           {% endfor %}
         </select>
       </td>
-      <td>
-        <select name="session_type">
+      <td class="px-4 py-3">
+        <select name="session_type" class="input-field !py-1.5 !px-2 !text-xs !rounded-lg">
           <option value="" selected>— Any —</option>
           {% for st in session_types %}
             <option value="{{ st }}">{{ st }}</option>
           {% endfor %}
         </select>
       </td>
-      <td><button type="button" class="button danger" onclick="removeRow(this)">✕</button></td>
+      <td class="px-4 py-3 text-right">
+        <button type="button" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors" onclick="removeRow(this)">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+        </button>
+      </td>
     </tr>
   </template>
 
@@ -125,13 +154,6 @@
       const y2 = m[1].slice(-2);
       return `${m[3]}-${m[2]}-${y2}`;
     }
-    function todayIsoLocal() {
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    }
     function initDatePickers(root) {
       const rows = (root || document).querySelectorAll('tr.rule-row');
       rows.forEach(tr => {
@@ -147,7 +169,6 @@
             currentIso = iso;
           }
         }
-        // Allow any date to be selected (no min constraint)
         picker.removeAttribute('min');
         const syncHidden = () => { hidden.value = toDdMmYy(picker.value); };
         picker.addEventListener('change', syncHidden);
@@ -156,7 +177,6 @@
     }
     document.addEventListener('DOMContentLoaded', () => {
       initDatePickers();
-      // Ensure dates are synced right before submit (in case change/input didn't fire)
       const form = document.querySelector('form[action="/schedule/save"]');
       if (form) {
         form.addEventListener('submit', () => {
@@ -173,23 +193,21 @@
       const tbody = document.querySelector('#rulesTable tbody');
       const node = document.importNode(tpl.content, true);
       tbody.appendChild(node);
-      // Initialize datepicker on the newly added row
       const lastRow = tbody.querySelector('tr.rule-row:last-child');
       initDatePickers(lastRow);
+      // Re-init lucide icons for new row
+      if (window.lucide) lucide.createIcons();
     }
     function removeRow(btn) {
       const tr = btn.closest('tr');
       if (!tr) return;
-      // Mark as deleted and hide
       const flag = tr.querySelector('input.deleted-flag');
       if (flag) flag.value = '1';
-      // Neutralize browser validation on hidden controls that are not submitted anyway
       const picker = tr.querySelector('input.date-picker');
       if (picker) {
         picker.removeAttribute('min');
-        picker.disabled = true; // exclude from constraint validation and submission
+        picker.disabled = true;
       }
-      // Keep hidden 'date', visible start/end/etc so backend can align lists and process deletion via id+deleted
       tr.style.display = 'none';
     }
   </script>

@@ -1,37 +1,160 @@
 {% extends "base.html" %}
-{% block title %}Bot Admin Panel{% endblock %}
+{% block title %}Dashboard{% endblock %}
 {% block content %}
-  <h1>🤖 Bot Admin Panel</h1>
-  {% if saved %}<div class="alert">✓ Changes saved!</div>{% endif %}
-  {% if deleted %}<div class="alert">✓ Event deleted!</div>{% endif %}
-  {% if added %}<div class="alert">✓ Event added!</div>{% endif %}
-  {% if updated %}<div class="alert">✓ Event updated!</div>{% endif %}
-  {% if new_bookings_today and new_bookings_today > 0 %}<div class="alert">🔔 New bookings today: <strong>{{ new_bookings_today }}</strong> — <a href="/bookings" class="button" title="See all recent bookings">View</a></div>{% endif %}
-
-  <div class="card">
-    <h2>📋 Quick Actions</h2>
-    <p class="muted" style="margin-bottom:8px">Use these shortcuts to jump directly to common tasks. Hover any button to learn more.</p>
-    <a href="/events" class="button success" title="Create, edit, or remove public events">🎬 Manage Events</a>
-    <a href="/quiz" class="button" title="Manage onboarding quiz questions and answers">🧩 Manage Quiz</a>
-    <a href="/bookings" class="button" title="See all registrations and manage attendance">📅 View Bookings</a>
-    <a href="/system" class="button {{ 'success' if bot_running else 'danger' }}" title="System Info details — Bot is {{ 'running' if bot_running else 'stopped' }}" aria-label="System Info">ℹ️ System Info</a>
+  <div class="mb-8">
+    <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+      Welcome back, Admin!
+    </h1>
+    <p class="text-slate-500 dark:text-slate-400 mt-1">Here's what's happening with your bot today.</p>
   </div>
 
+  {% if saved or deleted or added or updated %}
+    <div class="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-3 text-emerald-800 dark:text-emerald-200 animate-in fade-in slide-in-from-top-4 duration-300">
+      <i data-lucide="check-circle" class="w-5 h-5"></i>
+      <span class="font-medium">Changes saved successfully!</span>
+    </div>
+  {% endif %}
 
-  <div class="card">
-    <h2>📊 Telegram Metrics (Today)</h2>
-    <p><strong>New users:</strong> {{ metrics_overview.new_users if metrics_overview else 0 }}</p>
-    <p><strong>Active users:</strong> {{ metrics_overview.active_users if metrics_overview else 0 }}</p>
-    <h3>Top features (7 days)</h3>
-    {% if top_features and top_features|length > 0 %}
-      <ul>
-        {% for k, v in top_features %}
-          <li>{{ k }} — {{ v }}</li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p style="color:#888;">No data yet</p>
-    {% endif %}
-    <p><a class="button" href="/metrics" title="See detailed dashboards and trends">Open full metrics →</a></p>
+  {% if new_bookings_today and new_bookings_today > 0 %}
+    <div class="mb-8 p-4 rounded-2xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 flex items-center justify-between gap-4 animate-in zoom-in duration-500">
+      <div class="flex items-center gap-3 text-primary-900 dark:text-primary-100">
+        <div class="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center animate-pulse">
+          <i data-lucide="bell" class="w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+        </div>
+        <div>
+          <p class="font-bold text-lg leading-none">{{ new_bookings_today }} new bookings today!</p>
+          <p class="text-sm opacity-80">Don't forget to review them.</p>
+        </div>
+      </div>
+      <a href="/bookings" class="btn btn-primary !py-2 !px-4">
+        Review Bookings <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </a>
+    </div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+    <!-- Metrics Cards -->
+    <div class="card p-6 flex flex-col gap-4">
+      <div class="flex items-center justify-between">
+        <div class="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+          <i data-lucide="users" class="w-6 h-6"></i>
+        </div>
+        <span class="badge bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">New Users</span>
+      </div>
+      <div>
+        <p class="text-3xl font-bold">{{ metrics_overview.new_users if metrics_overview else 0 }}</p>
+        <p class="text-xs text-slate-500 mt-1">Total registrations today</p>
+      </div>
+    </div>
+
+    <div class="card p-6 flex flex-col gap-4">
+      <div class="flex items-center justify-between">
+        <div class="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
+          <i data-lucide="activity" class="w-6 h-6"></i>
+        </div>
+        <span class="badge bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">Active Users</span>
+      </div>
+      <div>
+        <p class="text-3xl font-bold">{{ metrics_overview.active_users if metrics_overview else 0 }}</p>
+        <p class="text-xs text-slate-500 mt-1">Unique users interacted</p>
+      </div>
+    </div>
+
+    <!-- Quick Link: Manage Events -->
+    <a href="/events" class="card p-6 group hover:border-primary-500/50 transition-colors">
+      <div class="flex flex-col h-full justify-between">
+        <div class="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform">
+          <i data-lucide="clapperboard" class="w-6 h-6"></i>
+        </div>
+        <div class="mt-4">
+          <p class="font-bold text-lg">Manage Events</p>
+          <p class="text-sm text-slate-500">Edit your public poster</p>
+        </div>
+      </div>
+    </a>
+
+    <!-- Quick Link: System Info -->
+    <a href="/system" class="card p-6 group hover:border-amber-500/50 transition-colors">
+      <div class="flex flex-col h-full justify-between">
+        <div class="w-12 h-12 rounded-xl {{ 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' if bot_running else 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' }} flex items-center justify-center group-hover:scale-110 transition-transform">
+          <i data-lucide="cpu" class="w-6 h-6"></i>
+        </div>
+        <div class="mt-4">
+          <p class="font-bold text-lg">System Info</p>
+          <div class="flex items-center gap-1.5 mt-0.5">
+            <div class="w-2 h-2 rounded-full {{ 'bg-emerald-500 animate-pulse' if bot_running else 'bg-amber-500' }}"></div>
+            <p class="text-xs text-slate-500">Bot is {{ 'Online' if bot_running else 'Offline' }}</p>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Top Features -->
+    <div class="card lg:col-span-2 p-8">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-xl font-bold">Top Features</h2>
+          <p class="text-sm text-slate-500">Most used bot sections (Last 7 days)</p>
+        </div>
+        <a href="/metrics" class="btn btn-secondary !py-2 !px-3 !text-xs">
+          View all metrics
+        </a>
+      </div>
+
+      {% if top_features and top_features|length > 0 %}
+        <div class="space-y-4">
+          {% for k, v in top_features %}
+            <div>
+              <div class="flex justify-between text-sm font-medium mb-1.5">
+                <span>{{ k }}</span>
+                <span class="text-slate-500">{{ v }} usages</span>
+              </div>
+              <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
+                {% set max_v = top_features[0][1] %}
+                <div class="bg-primary-500 h-2 rounded-full" style="width: {{ (v / max_v * 100)|round }}%"></div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="flex flex-col items-center justify-center py-12 opacity-50">
+          <i data-lucide="bar-chart-2" class="w-12 h-12 mb-2"></i>
+          <p>No data available yet</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Quick Actions List -->
+    <div class="card p-8 bg-slate-50 dark:bg-slate-800/30 border-dashed">
+      <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+        <i data-lucide="zap" class="w-5 h-5 text-primary-500"></i>
+        Quick Actions
+      </h2>
+      <nav class="flex flex-col gap-2">
+        <a href="/quiz" class="flex items-center justify-between p-3 rounded-xl hover:bg-white dark:hover:bg-slate-800 shadow-sm transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700 group">
+          <span class="flex items-center gap-3">
+            <i data-lucide="help-circle" class="w-5 h-5 text-slate-400 group-hover:text-primary-500"></i>
+            <span class="text-sm font-medium">Manage Quiz</span>
+          </span>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>
+        </a>
+        <a href="/schedule" class="flex items-center justify-between p-3 rounded-xl hover:bg-white dark:hover:bg-slate-800 shadow-sm transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700 group">
+          <span class="flex items-center gap-3">
+            <i data-lucide="clock" class="w-5 h-5 text-slate-400 group-hover:text-primary-500"></i>
+            <span class="text-sm font-medium">Edit Schedule</span>
+          </span>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>
+        </a>
+        <a href="/i18n" class="flex items-center justify-between p-3 rounded-xl hover:bg-white dark:hover:bg-slate-800 shadow-sm transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700 group">
+          <span class="flex items-center gap-3">
+            <i data-lucide="languages" class="w-5 h-5 text-slate-400 group-hover:text-primary-500"></i>
+            <span class="text-sm font-medium">Translations</span>
+          </span>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>
+        </a>
+      </nav>
+    </div>
   </div>
 {% endblock %}

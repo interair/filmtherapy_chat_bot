@@ -19,7 +19,7 @@ class QuizStates(StatesGroup):
 
 @router.message(F.text.in_({"Что посмотреть?", "What to watch?", "🎥 Что посмотреть?", "🎥 What to watch?"}))
 async def quiz_start(message: Message, state: FSMContext) -> None:
-    lang = user_lang(message)
+    lang = await user_lang(message)
     cfg = await container.quiz_repository().get_config()
     moods = [(m.get("title", ""), m.get("code", "")) for m in cfg.get("moods", [])]
     rows = [[(title, f"mood:{code}")] for title, code in moods if title and code]
@@ -29,7 +29,7 @@ async def quiz_start(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("mood:"))
 async def quiz_mood(cb: CallbackQuery, state: FSMContext) -> None:
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     code = cb.data.split(":", 1)[1]
     await state.update_data(mood=code)
     await state.set_state(QuizStates.choosing_company)
@@ -45,7 +45,7 @@ async def quiz_mood(cb: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("company:"))
 async def quiz_company(cb: CallbackQuery, state: FSMContext) -> None:
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     _, mood_code, comp_code = cb.data.split(":", 2)
     cfg = await container.quiz_repository().get_config()
     recs = cfg.get("recs", {})

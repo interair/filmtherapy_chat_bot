@@ -1,31 +1,59 @@
 {% extends "base.html" %}
 {% block title %}Locations{% endblock %}
 {% block content %}
-  <h1>📍 Locations</h1>
-  <a href="/" class="button">← Back</a>
-  <a href="/locations/types" class="button outline" style="margin-left:8px">Per-type mapping…</a>
-  {% if saved %}<div class="alert">✓ Сохранено</div>{% endif %}
-  {% if deleted %}<div class="alert">✓ Удалено</div>{% endif %}
-  <div class="card">
-    <h3>List</h3>
-    <ul style="list-style: none; padding-left: 0">
-      {% if items %}
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div>
+      <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+        <i data-lucide="map-pin" class="text-primary-600"></i>
+        Locations
+      </h1>
+      <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Manage places where sessions can be held.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/locations/types" class="btn btn-secondary">
+        <i data-lucide="git-branch" class="w-4 h-4"></i> Per-type mapping
+      </a>
+    </div>
+  </div>
+
+  {% if saved %}
+    <div class="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-3 text-emerald-800 dark:text-emerald-200">
+      <i data-lucide="check-circle" class="w-5 h-5"></i>
+      <span class="font-medium">Saved</span>
+    </div>
+  {% endif %}
+  {% if deleted %}
+    <div class="mb-6 p-4 rounded-2xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 flex items-center gap-3 text-rose-800 dark:text-rose-200">
+      <i data-lucide="trash-2" class="w-5 h-5"></i>
+      <span class="font-medium">Deleted</span>
+    </div>
+  {% endif %}
+
+  <div class="card p-8">
+    <h3 class="text-xl font-bold mb-4">List</h3>
+    {% if items %}
+      <ul class="divide-y divide-slate-200 dark:divide-slate-700">
         {% for it in items %}
-          <li style="margin:6px 0">
-            {{ it.name }}
-            <a class="button danger" style="padding:2px 8px;font-size:12px" href="/locations/delete/{{ it.enc }}" onclick="return confirm('Удалить локацию?')">🗑️</a>
+          <li class="py-3 flex items-center justify-between">
+            <span class="font-medium">{{ it.name }}</span>
+            <a class="p-2 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors" href="/locations/delete/{{ it.enc }}" onclick="return confirm('Удалить локацию?')" title="Delete">
+              <i data-lucide="trash-2" class="w-5 h-5"></i>
+            </a>
           </li>
         {% endfor %}
-      {% else %}
-        <li><em>Список пуст</em></li>
-      {% endif %}
-    </ul>
+      </ul>
+    {% else %}
+      <p class="text-slate-500 dark:text-slate-400">Список пуст</p>
+    {% endif %}
   </div>
-  <div class="card">
-    <h3>Add location</h3>
-    <form method="post" action="/locations/add">
-      <p><input type="text" name="name" placeholder="e.g., IJsbaanpad 9" required></p>
-      <p><button type="submit" class="button">➕ Add</button></p>
+
+  <div class="card p-8 mt-6">
+    <h3 class="text-xl font-bold mb-4">Add location</h3>
+    <form method="post" action="/locations/add" class="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+      <input type="text" name="name" placeholder="e.g., IJsbaanpad 9" required class="input-field flex-grow" />
+      <button type="submit" class="btn btn-primary">
+        <i data-lucide="plus" class="w-4 h-4"></i> Add
+      </button>
     </form>
   </div>
 {% endblock %}

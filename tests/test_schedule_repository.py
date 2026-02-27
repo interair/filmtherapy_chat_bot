@@ -9,6 +9,7 @@ class FakeSnap:
     def __init__(self, doc_id: str, data: dict):
         self.id = doc_id
         self._data = dict(data)
+        self.exists = True
 
     def to_dict(self):
         return dict(self._data)
@@ -19,11 +20,19 @@ class FakeDocRef:
         self._store = store
         self.id = doc_id
 
-    def set(self, data: dict, merge: bool = False):
+    async def get(self):
+        data = self._store.get(self.id)
+        if data is None:
+            snap = FakeSnap(self.id, {})
+            snap.exists = False
+            return snap
+        return FakeSnap(self.id, data)
+
+    async def set(self, data: dict, merge: bool = False):
         # Firestore set(merge=False) replaces the doc
         self._store[self.id] = dict(data)
 
-    def delete(self):
+    async def delete(self):
         self._store.pop(self.id, None)
 
 
@@ -34,9 +43,11 @@ class FakeCollection:
     def document(self, doc_id: str) -> FakeDocRef:
         return FakeDocRef(self._store, doc_id)
 
-    def stream(self):
+    async def stream(self):
         # Return snapshot-like objects
-        return [FakeSnap(doc_id, data) for doc_id, data in self._store.items()]
+        # In actual AsyncClient, stream() is an async generator
+        for doc_id, data in self._store.items():
+            yield FakeSnap(doc_id, data)
 
 
 class FakeFirestoreClient:
@@ -52,9 +63,9 @@ class FakeFirestoreClient:
 @pytest.fixture()
 def fake_firestore(monkeypatch):
     fake = FakeFirestoreClient()
-    # Patch the get_client used inside repositories module
+    # Patch the get_async_client used inside repositories module
     import src.services.repositories as repos_mod
-    monkeypatch.setattr(repos_mod, "get_client", lambda: fake)
+    monkeypatch.setattr(repos_mod, "get_async_client", lambda: fake)
     return fake
 
 
@@ -143,18 +154,3 @@ async def test_save_ignores_invalid_items(fake_firestore):
     assert set(col._store.keys()) == {valid.id}
 
 
-def test_sync_methods_match_async(fake_firestore):
-    repo = ScheduleRepository()
-    r1 = make_rule("05-01-30", "08:00", "09:00")
-    r2 = make_rule("05-01-30", "07:00", "08:00")
-
-    # Use sync save
-    repo.save_sync([r1, r2])
-
-    # get_sync returns sorted
-    out_sync = repo.get_sync()
-    assert [x.id for x in out_sync] == [r2.id, r1.id]
-
-    # And internal store contains the same ids
-    col = fake_firestore.collection("schedule")
-    assert set(col._store.keys()) == {r1.id, r2.id}

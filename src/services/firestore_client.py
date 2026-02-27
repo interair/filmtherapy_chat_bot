@@ -8,18 +8,16 @@ from google.cloud import firestore
 
 
 @lru_cache(maxsize=1)
-def get_client(project_id: Optional[str] = None) -> firestore.Client:
-    """Return a cached Firestore client.
+def get_async_client(project_id: Optional[str] = None) -> firestore.AsyncClient:
+    """Return a cached asynchronous Firestore client."""
+    project = _get_project_id(project_id)
+    return firestore.AsyncClient(project=project) if project else firestore.AsyncClient()
 
-    Project ID resolution order:
-    - explicit project_id argument
-    - GOOGLE_CLOUD_PROJECT / GCP_PROJECT / GCLOUD_PROJECT env vars
-    - default application credentials project
-    """
-    project = (
+
+def _get_project_id(project_id: Optional[str] = None) -> Optional[str]:
+    return (
         project_id
         or os.getenv("GOOGLE_CLOUD_PROJECT")
         or os.getenv("GCP_PROJECT")
         or os.getenv("GCLOUD_PROJECT")
     )
-    return firestore.Client(project=project) if project else firestore.Client()

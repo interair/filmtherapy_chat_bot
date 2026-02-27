@@ -1,41 +1,65 @@
 {% extends "base.html" %}
 {% block title %}Translations Editor{% endblock %}
 {% block content %}
-  <h1>🌐 Translations Editor (RU/EN)</h1>
-  <a href="/" class="button" title="Return to main dashboard">← Back to Admin</a>
-  {% if saved %}<div class="alert">✓ Translations saved</div>{% endif %}
+  <div class="mb-8">
+    <a href="/" class="inline-flex items-center text-sm font-medium text-slate-500 hover:text-primary-600 transition-colors mb-4 group">
+      <i data-lucide="arrow-left" class="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform"></i>
+      Back to Dashboard
+    </a>
+    <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+      <i data-lucide="languages" class="text-primary-600"></i>
+      Translations Editor (RU/EN)
+    </h1>
+  </div>
 
-  <div class="card">
-    <p class="muted">Edit the texts users see in the bot. Tip: hover a field to see a hint.</p>
-    <form action="/i18n/save" method="post">
-      <table>
-        <tr><th>Key</th><th>RU</th><th>EN</th></tr>
+  {% if saved %}
+    <div class="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-3 text-emerald-800 dark:text-emerald-200">
+      <i data-lucide="check-circle" class="w-5 h-5"></i>
+      <span class="font-medium">Translations saved</span>
+    </div>
+  {% endif %}
+
+  <div class="card p-6">
+    <p class="text-sm text-slate-500 mb-4">Edit the texts users see in the bot. Tip: hover a field to see a hint.</p>
+    <form action="/i18n/save" method="post" class="overflow-x-auto">
+      <table class="min-w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-slate-50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-700">
+            <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Key</th>
+            <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">RU</th>
+            <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">EN</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-700/40">
         {% for key in keys %}
           <tr>
-            <td style="white-space:nowrap">{{ key }}</td>
-            <td>
+            <td class="px-4 py-3 whitespace-nowrap text-xs font-mono text-slate-600 dark:text-slate-300">{{ key }}</td>
+            <td class="px-4 py-3">
               {% set ru_val = ru.get(key, '') %}
               {% if is_multiline(key, ru_val) %}
-                <textarea name="ru:{{ key }}" rows="3" cols="80" title="Russian translation for key {{ key }}">{{ ru_val }}</textarea>
+                <textarea name="ru:{{ key }}" rows="3" class="input-field" title="Russian translation for key {{ key }}">{{ ru_val }}</textarea>
               {% else %}
-                <input type="text" name="ru:{{ key }}" size="80" value="{{ ru_val }}" title="Russian translation for key {{ key }}" />
+                <input type="text" name="ru:{{ key }}" class="input-field" value="{{ ru_val }}" title="Russian translation for key {{ key }}" />
               {% endif %}
             </td>
-            <td>
+            <td class="px-4 py-3">
               {% set en_val = en.get(key, '') %}
               {% if is_multiline(key, en_val) %}
-                <textarea name="en:{{ key }}" rows="3" cols="80" title="English translation for key {{ key }}">{{ en_val }}</textarea>
+                <textarea name="en:{{ key }}" rows="3" class="input-field" title="English translation for key {{ key }}">{{ en_val }}</textarea>
               {% else %}
-                <input type="text" name="en:{{ key }}" size="80" value="{{ en_val }}" title="English translation for key {{ key }}" />
+                <input type="text" name="en:{{ key }}" class="input-field" value="{{ en_val }}" title="English translation for key {{ key }}" />
               {% endif %}
             </td>
           </tr>
         {% endfor %}
+        </tbody>
       </table>
-      <p>
-        <button type="submit" class="button success" title="Save all translation changes">💾 Save translations</button>
-        <a href="/" class="button" title="Exit without saving">Cancel</a>
-      </p>
+      <div class="flex items-center gap-3 mt-6">
+        <button type="submit" class="btn btn-primary" title="Save all translation changes">
+          <i data-lucide="save" class="w-4 h-4"></i> Save translations
+        </button>
+        <a href="/" class="btn btn-secondary" title="Exit without saving">Cancel</a>
+      </div>
     </form>
   </div>
 {% endblock %}

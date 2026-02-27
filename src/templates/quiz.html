@@ -1,43 +1,66 @@
 {% extends "base.html" %}
 {% block title %}Manage Quiz{% endblock %}
 {% block content %}
-  <h1>🧩 Manage Quiz</h1>
-  <a href="/" class="button">← Back to Admin</a>
+  <div class="mb-8">
+    <a href="/" class="inline-flex items-center text-sm font-medium text-slate-500 hover:text-primary-600 transition-colors mb-4 group">
+      <i data-lucide="arrow-left" class="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform"></i>
+      Back to Dashboard
+    </a>
+    <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+      <i data-lucide="help-circle" class="text-primary-600"></i>
+      Manage Quiz
+    </h1>
+    <p class="text-slate-500 dark:text-slate-400 mt-1">Configure moods, companies, and movie recommendations.</p>
+  </div>
 
-  <form method="post" action="/quiz/save">
-    <div class="card">
-      <h3>Options</h3>
-      <p>Enter one per line as: Title|code</p>
-      <label>Moods:</label>
-      <textarea name="moods" rows="5">{{ moods_text }}</textarea>
-      <label>Companies:</label>
-      <textarea name="companies" rows="5">{{ companies_text }}</textarea>
+  <form method="post" action="/quiz/save" class="space-y-8">
+    <div class="card p-8">
+      <h3 class="text-xl font-bold mb-4">Options</h3>
+      <p class="text-sm text-slate-500 mb-4">Enter one per line as: <code>Title|code</code></p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Moods</label>
+          <textarea name="moods" rows="8" class="input-field" placeholder="Happy|happy\nSad|sad">{{ moods_text }}</textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Companies</label>
+          <textarea name="companies" rows="8" class="input-field" placeholder="Netflix|nfx\nA24|a24">{{ companies_text }}</textarea>
+        </div>
+      </div>
     </div>
 
-    <div class="card">
-      <h3>Recommendations by pair</h3>
-      <p>One film per line for each Mood × Company</p>
+    <div class="card p-8">
+      <h3 class="text-xl font-bold mb-4">Recommendations by pair</h3>
+      <p class="text-sm text-slate-500 mb-6">Provide one film per line for each Mood × Company</p>
       {% if moods and companies %}
-        <table>
+        <div class="space-y-6">
           {% for m in moods %}
-            <tr>
-              {% for c in companies %}
-                {% set pair_key = m.code ~ '|' ~ c.code %}
-                <td>
-                  <div>
-                    <small>{{ m.title }} × {{ c.title }}</small><br>
-                    <textarea name="rec:{{ pair_key }}" rows="3" cols="30">{% if recs.get(pair_key) %}{{ recs.get(pair_key)|join('\n') }}{% endif %}</textarea>
+            <div class="space-y-3">
+              <h4 class="text-sm font-semibold text-slate-600 dark:text-slate-300">{{ m.title }}</h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for c in companies %}
+                  {% set pair_key = m.code ~ '|' ~ c.code %}
+                  <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                      <small class="text-xs font-medium text-slate-500">{{ c.title }}</small>
+                    </div>
+                    <textarea name="rec:{{ pair_key }}" rows="3" class="input-field" placeholder="Movie title one\nMovie title two">{% if recs.get(pair_key) %}{{ recs.get(pair_key)|join('\n') }}{% endif %}</textarea>
                   </div>
-                </td>
-              {% endfor %}
-            </tr>
+                {% endfor %}
+              </div>
+            </div>
           {% endfor %}
-        </table>
+        </div>
       {% else %}
-        <p>Add moods and companies to configure recommendations.</p>
+        <div class="p-8 text-center text-slate-500 dark:text-slate-400">Add moods and companies to configure recommendations.</div>
       {% endif %}
     </div>
 
-    <p><button class="button success" type="submit">💾 Save</button></p>
+    <div class="flex items-center gap-3">
+      <button class="btn btn-primary" type="submit">
+        <i data-lucide="save" class="w-4 h-4"></i> Save
+      </button>
+      <a href="/" class="btn btn-secondary">Cancel</a>
+    </div>
   </form>
 {% endblock %}

@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +35,11 @@ class Event(BaseModel):
     description: Optional[str] = None
     photo: Optional[str] = None  # filename in data/ (served at /static/<filename>)
 
-    class Config:
+    model_config = ConfigDict(
         # For Jinja2 compatibility, allow attribute-style access and JSON serialization
-        populate_by_name = True
-        str_strip_whitespace = True
+        populate_by_name=True,
+        str_strip_whitespace=True
+    )
 
 
 class EventCreate(BaseModel):
@@ -49,9 +50,10 @@ class EventCreate(BaseModel):
     price: Optional[float] = None
     description: Optional[str] = None
 
-    class Config:
-        populate_by_name = True
-        str_strip_whitespace = True
+    model_config = ConfigDict(
+        populate_by_name=True,
+        str_strip_whitespace=True
+    )
 
 
 class Booking(BaseModel):
@@ -96,10 +98,11 @@ class Booking(BaseModel):
     def _validate_status(cls, v):
         return cls._coerce_enum(v, BookingStatus, "status")
 
-    class Config:
-        populate_by_name = True
-        str_strip_whitespace = True
-        use_enum_values = True
+    model_config = ConfigDict(
+        populate_by_name=True,
+        str_strip_whitespace=True,
+        use_enum_values=True
+    )
 
 
 class ScheduleRule(BaseModel):
@@ -180,6 +183,7 @@ class ScheduleRule(BaseModel):
             object.__setattr__(self, "id", doc_id)
         return self
 
-    class Config:
-        populate_by_name = True
-        str_strip_whitespace = True
+    model_config = ConfigDict(
+        populate_by_name=True,
+        str_strip_whitespace=True
+    )

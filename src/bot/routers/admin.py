@@ -19,7 +19,7 @@ def is_admin(user_id: int) -> bool:
 
 @router.message(Command("admin"))
 async def admin_help(message: Message) -> None:
-    lang = user_lang(message)
+    lang = await user_lang(message)
     if not is_admin(message.from_user.id):
         await message.answer(t(lang, "admin.no_access"))
         return
@@ -28,11 +28,11 @@ async def admin_help(message: Message) -> None:
 
 @router.message(Command("admin_bookings"))
 async def admin_bookings(message: Message) -> None:
-    lang = user_lang(message)
+    lang = await user_lang(message)
     if not is_admin(message.from_user.id):
         await message.answer(t(lang, "admin.no_access"))
         return
-    bookings = container.calendar_service().list_all_bookings()
+    bookings = await container.calendar_service().list_all_bookings()
     if not bookings:
         await message.answer("No bookings")
         return
@@ -44,7 +44,7 @@ async def admin_bookings(message: Message) -> None:
 
 @router.message(Command("admin_poster"))
 async def admin_poster(message: Message) -> None:
-    lang = user_lang(message)
+    lang = await user_lang(message)
     if not is_admin(message.from_user.id):
         await message.answer(t(lang, "admin.no_access"))
         return

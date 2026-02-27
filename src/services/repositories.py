@@ -24,7 +24,7 @@ from .storage import (
     QUIZ_PATH,
     read_json,
 )
-from .firestore_client import get_client
+from .firestore_client import get_async_client
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 T = TypeVar("T", bound=BaseModel)
@@ -107,7 +107,7 @@ class FirestoreRepository(Generic[T]):
     """
 
     def __init__(self, collection_name: str, model_class: Type[T]):
-        self._db = get_client()
+        self._db = get_async_client()
         self._col = self._db.collection(collection_name)
         self.model_class = model_class
         # Add validation cache per repository instance
@@ -115,8 +115,8 @@ class FirestoreRepository(Generic[T]):
 
     async def get_all(self) -> List[T]:
         items: List[T] = []
-        # Use select() to minimize data transfer if we only need specific fields
-        for doc in self._col.stream():
+        # Use stream() which is an async generator in AsyncClient
+        async for doc in self._col.stream():
             data = doc.to_dict() or {}
             if "id" not in data:
                 data["id"] = doc.id
@@ -130,7 +130,7 @@ class FirestoreRepository(Generic[T]):
 
     async def get_by_id(self, item_id: str) -> Optional[T]:
         # Single document lookup - already optimized
-        snap = self._col.document(str(item_id)).get()
+        snap = await self._col.document(str(item_id)).get()
         if not snap.exists:
             return None
         data = snap.to_dict() or {}
@@ -148,11 +148,11 @@ class FirestoreRepository(Generic[T]):
             raise ValidationError("Item must have 'id' field")
         doc_id = str(getattr(obj, "id"))
         ref = self._col.document(doc_id)
-        # Use get() with source=CACHE to check cache first, then server
-        if ref.get().exists:
+        snap = await ref.get()
+        if snap.exists:
             raise ValidationError(f"Item with id '{doc_id}' already exists")
         # Use Python-native types (datetime) so Firestore stores Timestamps, not strings
-        ref.set(obj.model_dump(mode="python"))
+        await ref.set(obj.model_dump(mode="python"))
         return obj
 
     async def update(self, item: T) -> T:
@@ -162,20 +162,20 @@ class FirestoreRepository(Generic[T]):
         doc_id = str(getattr(obj, "id"))
         ref = self._col.document(doc_id)
         # Cache existence check result to avoid double reads
-        snap = ref.get()
+        snap = await ref.get()
         if not snap.exists:
             raise NotFoundError(f"Item with id '{doc_id}' not found")
         # Use Python-native types (datetime) so Firestore stores Timestamps, not strings
-        ref.set(obj.model_dump(mode="python"), merge=False)
+        await ref.set(obj.model_dump(mode="python"), merge=False)
         return obj
 
     async def delete(self, item_id: str) -> bool:
         ref = self._col.document(str(item_id))
         # Cache existence check result
-        snap = ref.get()
+        snap = await ref.get()
         if not snap.exists:
             return False
-        ref.delete()
+        await ref.delete()
         return True
 
 
@@ -183,7 +183,7 @@ class FirestoreRepository(Generic[T]):
 class EventRepository(Repository[Event]):
     def __init__(self) -> None:
         self._repo = FirestoreRepository("events", Event)
-        self._col = get_client().collection("events")
+        self._col = get_async_client().collection("events")
         # Add index hint: Firestore needs composite index on (when, ASC)
         # for optimal performance of get_upcoming() query
 
@@ -208,7 +208,7 @@ class EventRepository(Repository[Event]):
         # Optimized: use limit() to avoid processing too many results
         # Add composite index: events collection on (when, ASC) for this query
         query = self._col.where(filter=FieldFilter("when", ">=", now)).order_by("when").limit(100)
-        for doc in query.stream():
+        async for doc in query.stream():
             data = doc.to_dict() or {}
             data.setdefault("id", doc.id)
             try:
@@ -223,71 +223,70 @@ class EventRepository(Repository[Event]):
                     continue
         return items
 
+
 class LocationRepository(Repository[Location]):
     """Firestore-backed repository for locations. Uses Location.name as doc id."""
 
     def __init__(self) -> None:
-        self._col = get_client().collection("locations")
+        self._repo = FirestoreRepository("locations", Location)
+        self._col = get_async_client().collection("locations")
 
     async def get_all(self) -> List[Location]:
-        items: List[Location] = []
-        for doc in self._col.stream():
-            name = doc.id
-            try:
-                items.append(Location(name=str(name)))
-            except Exception as e:
-                logger.error("Failed to create Location from doc_id=%s: %s", doc.id, e, exc_info=True)
-                continue
-        return items
+        return await self._repo.get_all()
 
     async def get_by_id(self, id: str) -> Optional[Location]:
-        doc = self._col.document(str(id).strip()).get()
-        if not doc.exists:
+        # Location names are doc IDs
+        snap = await self._col.document(str(id).strip()).get()
+        if not snap.exists:
             return None
-        return Location(name=doc.id)
+        return Location(name=snap.id)
 
     async def create(self, item: Location) -> Location:
         loc = Location.model_validate(item)
         doc_id = str(loc.name).strip()
         ref = self._col.document(doc_id)
-        if ref.get().exists:
+        snap = await ref.get()
+        if snap.exists:
             raise ValidationError(f"Location '{loc.name}' already exists")
-        ref.set({"name": doc_id})
+        await ref.set({"name": doc_id})
         return loc
 
     async def update(self, item: Location) -> Location:
         loc = Location.model_validate(item)
         doc_id = str(loc.name).strip()
         ref = self._col.document(doc_id)
-        if not ref.get().exists:
+        snap = await ref.get()
+        if not snap.exists:
             raise NotFoundError(f"Location '{loc.name}' not found")
         # only normalization; keep doc with same id
-        ref.set({"name": doc_id}, merge=True)
+        await ref.set({"name": doc_id}, merge=True)
         return loc
 
     async def delete(self, id: str) -> bool:
         ref = self._col.document(str(id).strip())
-        if not ref.get().exists:
+        snap = await ref.get()
+        if not snap.exists:
             return False
-        ref.delete()
+        await ref.delete()
         return True
 
     async def exists(self, name: str) -> bool:
-        return self._col.document(str(name).strip()).get().exists
+        snap = await self._col.document(str(name).strip()).get()
+        return snap.exists
 
 
 class QuizRepository:
     def __init__(self) -> None:
-        self._doc = get_client().collection("config").document("quiz")
+        self._doc = get_async_client().collection("config").document("quiz")
 
     async def get_config(self) -> Dict[str, Any]:
-        snap = self._doc.get()
+        snap = await self._doc.get()
         data = snap.to_dict() if snap.exists else None
         # Defaults: when Firestore is empty, load from local resource file and persist
         if not isinstance(data, dict) or not data:
             file_defaults = read_json(QUIZ_PATH, default={})
             data = file_defaults if isinstance(file_defaults, dict) else {}
-            self._doc.set(data)
+            await self._doc.set(data)
         # Normalize
         moods = data.get("moods") or []
         companies = data.get("companies") or []
@@ -351,7 +350,7 @@ class QuizRepository:
             for k, v in recs_in.items():
                 if isinstance(v, list):
                     out_recs[str(k)] = [str(x).strip() for x in v if str(x).strip()]
-        self._doc.set({"moods": out_moods, "companies": out_companies, "recs": out_recs}, merge=False)
+        await self._doc.set({"moods": out_moods, "companies": out_companies, "recs": out_recs}, merge=False)
 
 
 class UserLanguageRepository:
@@ -361,7 +360,7 @@ class UserLanguageRepository:
     _cache_ttl = 300  # 5 minutes TTL
 
     def __init__(self) -> None:
-        self._col = get_client().collection("user_lang")
+        self._col = get_async_client().collection("user_lang")
 
     def _is_cache_valid(self, key: str) -> bool:
         if key not in self._cache_timestamps:
@@ -373,10 +372,10 @@ class UserLanguageRepository:
         self._cache[key] = value
         self._cache_timestamps[key] = time.time()
 
-    def _fetch_language(self, user_id: int) -> Optional[str]:
+    async def _fetch_language(self, user_id: int) -> Optional[str]:
         """Fetch language from Firestore for the given user_id."""
         key = str(user_id)
-        snap = self._col.document(key).get()
+        snap = await self._col.document(key).get()
         
         if not snap.exists:
             self._update_cache(key, None)
@@ -392,50 +391,35 @@ class UserLanguageRepository:
         key = str(user_id)
         if key in self._cache and self._is_cache_valid(key):
             return self._cache[key]
-        return self._fetch_language(user_id)
+        return await self._fetch_language(user_id)
 
     async def set(self, user_id: int, lang: str) -> None:
         key = str(user_id)
         self._update_cache(key, str(lang))
         # Use merge=True to avoid overwriting other potential fields
-        self._col.document(key).set({"lang": str(lang)}, merge=True)
-
-    def get_sync(self, user_id: int) -> Optional[str]:
-        key = str(user_id)
-        if key in self._cache and self._is_cache_valid(key):
-            return self._cache[key]
-        return self._fetch_language(user_id)
-
-    def set_sync(self, user_id: int, lang: str) -> None:
-        key = str(user_id)
-        self._update_cache(key, str(lang))
-        self._col.document(key).set({"lang": str(lang)}, merge=True)
+        await self._col.document(key).set({"lang": str(lang)}, merge=True)
 
 
 class AboutRepository:
     def __init__(self) -> None:
-        self._doc = get_client().collection("config").document("about")
+        self._doc = get_async_client().collection("config").document("about")
 
-    def _get_document_data(self) -> Dict[str, Any]:
+    async def _get_document_data(self) -> Dict[str, Any]:
         """Fetch and return document data from Firestore."""
-        snap = self._doc.get()
+        snap = await self._doc.get()
         return snap.to_dict() or {}
 
     async def get(self) -> Dict[str, Any]:
-        return self._get_document_data()
+        return await self._get_document_data()
 
     async def save(self, data: Dict[str, Any]) -> None:
         if not isinstance(data, dict):
             data = {}
         # Do not store actual files in Firestore, only metadata (e.g., filename)
-        self._doc.set(data, merge=False)
+        await self._doc.set(data, merge=False)
 
     async def get_photo_file_path(self) -> Optional[str]:
-        # Kept for backward compatibility; delegates to sync version
-        return self.get_photo_file_path_sync()
-
-    def get_photo_file_path_sync(self) -> Optional[str]:
-        data = self._get_document_data()
+        data = await self._get_document_data()
         fn = data.get("photo") if isinstance(data, dict) else None
         if not isinstance(fn, str) or not fn:
             return None
@@ -444,12 +428,12 @@ class AboutRepository:
 
     async def set_photo(self, filename: str) -> None:
         # Store only the filename in Firestore
-        self._doc.set({"photo": filename}, merge=True)
+        await self._doc.set({"photo": filename}, merge=True)
 
     # --- Film club (cinema) About photos management ---
-    def list_cinema_photos(self) -> list[str]:
+    async def list_cinema_photos(self) -> list[str]:
         """Return list of saved cinema (film club) photo filenames that exist on disk."""
-        data = self._get_document_data()
+        data = await self._get_document_data()
         items = data.get("cinema_photos")
         if not isinstance(items, list):
             return []
@@ -463,27 +447,27 @@ class AboutRepository:
         return out
 
     async def add_cinema_photo(self, filename: str) -> None:
-        data = self._get_document_data()
+        data = await self._get_document_data()
         items = data.get("cinema_photos")
         if not isinstance(items, list):
             items = []
         if filename not in items:
             items.append(filename)
-        self._doc.set({"cinema_photos": items}, merge=True)
+        await self._doc.set({"cinema_photos": items}, merge=True)
 
     async def delete_cinema_photo(self, filename: str) -> None:
-        data = self._get_document_data()
+        data = await self._get_document_data()
         items = data.get("cinema_photos")
         if not isinstance(items, list):
             items = []
         items = [x for x in items if x != filename]
-        self._doc.set({"cinema_photos": items}, merge=True)
+        await self._doc.set({"cinema_photos": items}, merge=True)
 
 
 class ScheduleRepository:
     def __init__(self) -> None:
         # Use dedicated Firestore collection for schedule rules
-        self._col = get_client().collection("schedule")
+        self._col = get_async_client().collection("schedule")
 
     # ---- Typed helpers ----------------------------------------------------
     @staticmethod
@@ -505,10 +489,10 @@ class ScheduleRepository:
         """
         return str(rule.id or f"{rule.date}|{rule.start}|{rule.location or ''}|{rule.session_type or ''}")
 
-    def _fetch_rules(self) -> List[ScheduleRule]:
+    async def _fetch_rules(self) -> List[ScheduleRule]:
         """Fetch all schedule rules from Firestore."""
         items: List[ScheduleRule] = []
-        for doc in self._col.stream():
+        async for doc in self._col.stream():
             data = doc.to_dict() or {}
             data.setdefault("id", doc.id)
             try:
@@ -524,7 +508,7 @@ class ScheduleRepository:
         items.sort(key=lambda r: (r.date, r.start))
         return items
 
-    def _persist_rules(self, rules_in: List[ScheduleRule]) -> None:
+    async def _persist_rules(self, rules_in: List[ScheduleRule]) -> None:
         """Persist schedule rules to Firestore.
         New behavior: only explicitly delete rules that are marked with deleted=True.
         All other incoming rules are upserted. Existing rules not present in the payload are preserved.
@@ -543,24 +527,16 @@ class ScheduleRepository:
                 upserts[doc_id] = r
         # Perform deletions by explicit ids
         for del_id in to_delete_ids:
-            self._col.document(del_id).delete()
+            await self._col.document(del_id).delete()
         # Upsert new/updated rules (exclude id and deleted from stored doc)
         for doc_id, r in upserts.items():
-            self._col.document(doc_id).set(r.model_dump(mode="python", exclude={"id", "deleted"}), merge=False)
+            await self._col.document(doc_id).set(r.model_dump(mode="python", exclude={"id", "deleted"}), merge=False)
 
     async def get(self) -> List[ScheduleRule]:
-        """Return all schedule rules as typed models."""
-        return self._fetch_rules()
+        return await self._fetch_rules()
 
     async def save(self, rules_in: List[ScheduleRule]) -> None:
-        self._persist_rules(rules_in)
-
-    # Synchronous helpers for non-async contexts
-    def get_sync(self) -> List[ScheduleRule]:
-        return self._fetch_rules()
-
-    def save_sync(self, rules_in: List[ScheduleRule]) -> None:
-        self._persist_rules(rules_in)
+        await self._persist_rules(rules_in)
 
     # Optional typed API for future usage
 
@@ -568,7 +544,7 @@ class ScheduleRepository:
 class BookingRepository(Repository[Booking]):
     def __init__(self) -> None:
         self._repo = FirestoreRepository("bookings", Booking)
-        self._col = get_client().collection("bookings")
+        self._col = get_async_client().collection("bookings")
         # Index hints for optimal query performance:
         # 1. Composite index on (start, ASC) for date range queries
         # 2. Composite index on (user_id, start, ASC) for user bookings
@@ -589,10 +565,10 @@ class BookingRepository(Repository[Booking]):
     async def delete(self, id: str) -> bool:
         return await self._repo.delete(id)
 
-    # --- Synchronous helpers for non-async contexts (e.g., CalendarService) ---
-    def get_all_sync(self) -> List[dict]:
+    # --- Async helpers (previously sync) ---
+    async def get_all_raw(self) -> List[dict]:
         items: List[dict] = []
-        for doc in self._col.stream():
+        async for doc in self._col.stream():
             d = doc.to_dict() or {}
             d.setdefault("id", doc.id)
             # Ensure strings for datetime fields in ISO-8601 with Z
@@ -600,8 +576,8 @@ class BookingRepository(Repository[Booking]):
             items.append(d)
         return items
 
-    def get_by_id_sync(self, id: str) -> Optional[dict]:
-        snap = self._col.document(str(id)).get()
+    async def get_by_id_raw(self, id: str) -> Optional[dict]:
+        snap = await self._col.document(str(id)).get()
         if not snap.exists:
             return None
         d = snap.to_dict() or {}
@@ -609,32 +585,33 @@ class BookingRepository(Repository[Booking]):
         _normalize_dict_datetimes(d, "start", "end", "created_at")
         return d
 
-    def set_sync(self, booking: dict) -> dict:
+    async def set_raw(self, booking: dict) -> dict:
         # Minimal validation: ensure id exists
         bid = str(booking.get("id") or "").strip()
         if not bid:
             raise ValidationError("Booking must have 'id'")
-        self._col.document(bid).set(booking, merge=False)
+        await self._col.document(bid).set(booking, merge=False)
         return booking
 
-    def patch_sync(self, id: str, fields: dict) -> dict:
-        snap = self._col.document(str(id)).get()
+    async def patch_raw(self, id: str, fields: dict) -> dict:
+        snap = await self._col.document(str(id)).get()
         if not snap.exists:
             raise NotFoundError(f"Booking '{id}' not found")
         cur = snap.to_dict() or {}
         cur.update(fields or {})
-        self._col.document(str(id)).set(cur, merge=False)
+        await self._col.document(str(id)).set(cur, merge=False)
         cur.setdefault("id", snap.id)
         return cur
 
-    def delete_sync(self, id: str) -> bool:
+    async def delete_raw(self, id: str) -> bool:
         ref = self._col.document(str(id))
-        if not ref.get().exists:
+        snap = await ref.get()
+        if not snap.exists:
             return False
-        ref.delete()
+        await ref.delete()
         return True
 
-    def get_for_date_sync(self, date: datetime) -> List[dict]:
+    async def get_for_date(self, date: datetime) -> List[dict]:
         """Return bookings whose 'start' falls on the given date (UTC) using range query."""
         # Compute UTC day range
         if date.tzinfo is None:
@@ -654,14 +631,14 @@ class BookingRepository(Repository[Booking]):
                 .order_by("start")
                 .limit(50))  # Add reasonable limit
         
-        for doc in query.stream():
+        async for doc in query.stream():
             d = doc.to_dict() or {}
             d.setdefault("id", doc.id)
             _normalize_dict_datetimes(d, "start", "end", "created_at")
             items.append(d)
         return items
 
-    def get_range_sync(self, start: datetime, end: datetime) -> List[dict]:
+    async def get_range(self, start: datetime, end: datetime) -> List[dict]:
         """Return bookings with 'start' < end and 'start' >= start; further filtering can be applied by caller."""
         if start.tzinfo is None:
             start = start.replace(tzinfo=timezone.utc)
@@ -684,14 +661,14 @@ class BookingRepository(Repository[Booking]):
                 .order_by("start")
                 .limit(limit))
         
-        for doc in query.stream():
+        async for doc in query.stream():
             d = doc.to_dict() or {}
             d.setdefault("id", doc.id)
             _normalize_dict_datetimes(d, "start", "end", "created_at")
             items.append(d)
         return items
 
-    def get_by_user_sync(self, user_id: int | str) -> List[dict]:
+    async def get_by_user(self, user_id: int | str) -> List[dict]:
         """Return bookings for the given user_id using equality filter."""
         uid = str(user_id)
         items: List[dict] = []
@@ -703,7 +680,7 @@ class BookingRepository(Repository[Booking]):
                 .order_by("start")
                 .limit(100))  # Reasonable limit for user bookings
         
-        for doc in query.stream():
+        async for doc in query.stream():
             d = doc.to_dict() or {}
             d.setdefault("id", doc.id)
             _normalize_dict_datetimes(d, "start", "end", "created_at")
@@ -718,11 +695,11 @@ class EventRegistrationRepository:
     Document id format: "<event_id>:<user_id>". Stored fields: id, event_id, user_id, user_name, created_at.
     """
     def __init__(self) -> None:
-        self._col = get_client().collection("event_regs")
+        self._col = get_async_client().collection("event_regs")
         # Index hint: Single field index on event_id for get_by_event queries
         # Index hint: Single field index on user_id for list_by_user queries
 
-    def _fetch_by_field(self, field: str, value: int | str, order: bool = True, limit: int = 200) -> List[dict]:
+    async def _fetch_by_field(self, field: str, value: int | str, order: bool = True, limit: int = 200) -> List[dict]:
         items: List[dict] = []
         val = str(value).strip()
         if not val:
@@ -731,8 +708,7 @@ class EventRegistrationRepository:
         if order:
             query = query.order_by("created_at")
         query = query.limit(limit)
-        docs = list(query.stream())
-        for doc in docs:
+        async for doc in query.stream():
             d = doc.to_dict() or {}
             d.setdefault("id", doc.id)
             items.append(d)
@@ -751,12 +727,12 @@ class EventRegistrationRepository:
             "user_name": str(user_name or "").strip(),
             "created_at": datetime.now(timezone.utc),
         }
-        self._col.document(doc_id).set(data, merge=True)
+        await self._col.document(doc_id).set(data, merge=True)
         return data
 
     async def get_one(self, event_id: str, user_id: int | str) -> Optional[dict]:
         doc_id = self._doc_id(event_id, user_id)
-        snap = self._col.document(doc_id).get()
+        snap = await self._col.document(doc_id).get()
         if not snap.exists:
             return None
         d = snap.to_dict() or {}
@@ -766,19 +742,20 @@ class EventRegistrationRepository:
     async def delete(self, event_id: str, user_id: int | str) -> bool:
         doc_id = self._doc_id(event_id, user_id)
         ref = self._col.document(doc_id)
-        if not ref.get().exists:
+        snap = await ref.get()
+        if not snap.exists:
             return False
-        ref.delete()
+        await ref.delete()
         return True
 
     async def get_by_event(self, event_id: str) -> List[dict]:
-        return self._fetch_by_field("event_id", event_id, order=True, limit=200)
+        return await self._fetch_by_field("event_id", event_id, order=True, limit=200)
 
     async def list_by_user(self, user_id: int | str) -> List[dict]:
         """Return all event registrations for the specified user.
         Each item contains at least: id, event_id, user_id, user_name, created_at.
         """
-        return self._fetch_by_field("user_id", user_id, order=True, limit=200)
+        return await self._fetch_by_field("user_id", user_id, order=True, limit=200)
 
 
 # SessionLocationsRepository: stores mapping of session types → list of locations
@@ -791,10 +768,10 @@ class SessionLocationsRepository:
     """
 
     def __init__(self) -> None:
-        self._doc = get_client().collection("config").document("session_locations")
+        self._doc = get_async_client().collection("config").document("session_locations")
 
     async def get_map(self) -> Dict[str, List[str]]:
-        snap = self._doc.get()
+        snap = await self._doc.get()
         data = snap.to_dict() if snap.exists else None
         if not isinstance(data, dict):
             data = {}
@@ -836,7 +813,7 @@ class SessionLocationsRepository:
                         seen.add(name)
                 normalized[key] = arr
         # Replace entirely to avoid stale entries
-        self._doc.set(normalized, merge=False)
+        await self._doc.set(normalized, merge=False)
 
     async def add(self, type_key: str, name: str) -> None:
         key = str(type_key).strip()

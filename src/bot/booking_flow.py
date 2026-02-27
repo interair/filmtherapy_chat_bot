@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def _next_dates(n: int = 30) -> list[str]:  # Increased from 7 to 30 days
     """Return next n dates in ISO format (YYYY-MM-DD) for internal use."""
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     return [(today + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(n)]
 
 
@@ -55,7 +55,7 @@ class BookingFlow:
             session_type=booking_data.session_type or "Session",
         )
         # Create reservation via calendar service (may raise ValidationError)
-        booking = self.calendar.create_reservation(
+        booking = await self.calendar.create_reservation(
             user_id=user_id,
             slot=slot,
             name=user_name,
@@ -76,7 +76,7 @@ class BookingFlow:
         end_date = datetime.strptime(iso_dates[-1], "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
         
         # Fetch all bookings for the period in a single query
-        all_bookings = self.calendar._bookings_repo.get_range_sync(start_date, end_date)
+        all_bookings = await self.calendar._bookings_repo.get_range(start_date, end_date)
         
         # Group bookings by date (ISO keys)
         bookings_by_date = {}
@@ -109,14 +109,14 @@ class BookingFlow:
 
     async def _get_schedule_rules(self) -> List[ScheduleRule]:
         """Cache schedule rules briefly to reduce Firestore reads (5 seconds TTL)."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if (
             self._schedule_cache is None
             or self._schedule_cache_time is None
             or (now - self._schedule_cache_time).total_seconds() > 5
         ):
             # Return models, not dicts
-            rules_models: List[ScheduleRule] = self.calendar._schedule_repo.get_sync() or []
+            rules_models: List[ScheduleRule] = await self.calendar._schedule_repo.get() or []
             self._schedule_cache = list(rules_models)
             self._schedule_cache_time = now
         return self._schedule_cache
@@ -159,4 +159,4 @@ class BookingFlow:
         Expects date_str in dd-mm-yy format from the user interface.
         """
         date = datetime.strptime(date_str, "%d-%m-%y").replace(tzinfo=timezone.utc)
-        return self.calendar.list_available_slots(date=date, location=location, session_type=session_type)
+        return await self.calendar.list_available_slots(date=date, location=location, session_type=session_type)

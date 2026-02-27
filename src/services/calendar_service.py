@@ -105,12 +105,14 @@ class CalendarService:
             return "online"
         return raw
 
-    def _day_busy_intervals(self, date: datetime) -> list[tuple[datetime, datetime]]:
+    async def _day_busy_intervals(self, date: datetime) -> list[tuple[datetime, datetime]]:
         """Collect busy intervals for the given date by querying Firestore, avoiding full collection scans."""
         from_iso = datetime.fromisoformat
         rep = self._bookings_repo
         busy: list[tuple[datetime, datetime]] = []
-        for b in rep.get_for_date_sync(date):
+        # get_for_date is now async
+        items = await rep.get_for_date(date)
+        for b in items:
             try:
                 s_s = b.get("start")
                 e_s = b.get("end")
@@ -197,11 +199,11 @@ class CalendarService:
                 yield slot_start, slot_end
             cur += step
 
-    def list_available_slots(
+    async def list_available_slots(
         self, date: datetime, location: Optional[str], session_type: str
     ) -> List[Slot]:
         # Build slots from recurrent schedule rules (from Firestore), avoid full bookings reload
-        rules: List[ScheduleRule] = self._schedule_repo.get_sync()
+        rules: List[ScheduleRule] = await self._schedule_repo.get()
         
         # Ensure the input date is timezone-aware
         if date.tzinfo is None:
@@ -215,7 +217,7 @@ class CalendarService:
         now_utc = datetime.now(timezone.utc)
 
         # Collect busy intervals for this date once
-        busy_intervals = self._day_busy_intervals(date)
+        busy_intervals = await self._day_busy_intervals(date)
 
         sel_loc = str(location or "").strip()
         for r in rules:
@@ -250,7 +252,7 @@ class CalendarService:
             b_end = b_end.replace(tzinfo=timezone.utc)
         return max(a_start, b_start) < min(a_end, b_end)
 
-    def create_reservation(
+    async def create_reservation(
         self,
         user_id: int,
         slot: Slot,
@@ -261,7 +263,7 @@ class CalendarService:
         # Ensure not double-booked: query only potentially conflicting bookings
         s_start = self.ensure_utc(slot.start)
         s_end = self.ensure_utc(slot.end)
-        potentially_conflicting = self._bookings_repo.get_range_sync(s_start, s_end)
+        potentially_conflicting = await self._bookings_repo.get_range(s_start, s_end)
         for b in potentially_conflicting:
             try:
                 bs = b.get("start")
@@ -274,7 +276,7 @@ class CalendarService:
                 continue
             if self.overlaps(s_start, s_end, b_start, b_end):
                 raise ValidationError("Slot already booked")
-        booking_id = f"b-{int(datetime.utcnow().timestamp())}-{user_id}"
+        booking_id = f"b-{int(datetime.now(timezone.utc).timestamp())}-{user_id}"
         iso = lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         booking = {
             "id": booking_id,
@@ -288,28 +290,28 @@ class CalendarService:
             "session_type": slot.session_type,
             "status": "pending_payment",
             "price": price,
-            "created_at": iso(datetime.utcnow().replace(tzinfo=timezone.utc)),
+            "created_at": iso(datetime.now(timezone.utc)),
         }
         # Persist to Firestore
-        self._bookings_repo.set_sync(booking)
+        await self._bookings_repo.set_raw(booking)
         return booking
 
-    def confirm_payment(self, booking_id: str) -> Dict:
+    async def confirm_payment(self, booking_id: str) -> Dict:
         # Directly patch in Firestore and return the updated doc
-        updated = self._bookings_repo.patch_sync(booking_id, {"status": "confirmed"})
+        updated = await self._bookings_repo.patch_raw(booking_id, {"status": "confirmed"})
         if not updated:
             raise KeyError("booking not found")
         return updated
 
-    def list_user_bookings(self, user_id: int) -> List[Dict]:
-        return self._bookings_repo.get_by_user_sync(user_id)
+    async def list_user_bookings(self, user_id: int) -> List[Dict]:
+        return await self._bookings_repo.get_by_user(user_id)
 
-    def list_all_bookings(self) -> List[Dict]:
-        return self._bookings_repo.get_all_sync()
+    async def list_all_bookings(self) -> List[Dict]:
+        return await self._bookings_repo.get_all_raw()
 
-    def cancel_booking(self, booking_id: str) -> Dict:
+    async def cancel_booking(self, booking_id: str) -> Dict:
         # Load the booking by id to check cancelation constraints
-        b = self._bookings_repo.get_by_id_sync(booking_id)
+        b = await self._bookings_repo.get_by_id_raw(booking_id)
         if not b:
             raise KeyError("booking not found")
         s_s = b.get("start")
@@ -321,16 +323,16 @@ class CalendarService:
             # Cannot cancel: 24h rule
             raise PermissionError("Cannot cancel less than 24 hours")
         # Remove from Firestore
-        self._bookings_repo.delete_sync(booking_id)
+        await self._bookings_repo.delete_raw(booking_id)
         canceled_at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         return {"id": booking_id, "status": "canceled", "canceled_at": canceled_at}
 
-    def admin_delete_booking(self, booking_id: str) -> Dict:
+    async def admin_delete_booking(self, booking_id: str) -> Dict:
         """Force-delete a booking regardless of time left (admin action)."""
-        b = self._bookings_repo.get_by_id_sync(booking_id)
+        b = await self._bookings_repo.get_by_id_raw(booking_id)
         if not b:
             raise KeyError("booking not found")
         # Delete from Firestore
-        self._bookings_repo.delete_sync(booking_id)
+        await self._bookings_repo.delete_raw(booking_id)
         deleted_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         return {"id": booking_id, "status": "deleted", "deleted_at": deleted_at}

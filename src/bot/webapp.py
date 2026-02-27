@@ -337,11 +337,11 @@ async def web_index(request: Request, metrics = Depends(get_metrics_service), fl
     deleted = flags.deleted
     added = flags.added
     updated = flags.updated
-    time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    overview = metrics.today_overview()
-    top_features = metrics.feature_usage(days=7, top_n=3)
+    time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    overview = await metrics.today_overview()
+    top_features = await metrics.feature_usage(days=7, top_n=3)
     # Count bookings created today (UTC) for attention banner
-    new_bookings_today = compute_new_bookings_today()
+    new_bookings_today = await compute_new_bookings_today()
     return templates.TemplateResponse("index.html", {
         "request": request,
         "saved": saved,
@@ -358,7 +358,7 @@ async def web_index(request: Request, metrics = Depends(get_metrics_service), fl
 
 @app.get("/system", response_class=HTMLResponse)
 async def web_system(request: Request, _: None = Depends(verify_web_auth)):
-    time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
     # Determine bot mode
     bot_mode = "webhook" if settings.use_webhook and settings.base_url else "polling"
@@ -457,7 +457,7 @@ async def web_events_save(
 ):
     data = await request.form()
 
-    event_id = data.get('id') or f"event-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    event_id = data.get('id') or f"event-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
 
     when_value = str(data['when'])
     if 'T' in when_value and len(when_value) == 16:
@@ -573,7 +573,7 @@ async def web_bookings(
     _: None = Depends(verify_web_auth),
 ):
     deleted = flags.deleted
-    raw = calendar_service.list_all_bookings()
+    raw = await calendar_service.list_all_bookings()
     items = BookingView.list_from_raw(raw)
     return templates.TemplateResponse("bookings.html", {"request": request, "items": items, "deleted": deleted})
 
@@ -799,7 +799,7 @@ async def web_about_cinema_add(
         if not file_field or not getattr(file_field, 'filename', ''):
             continue
         try:
-            ts = datetime.now().strftime('%Y%m%d-%H%M%S')
+            ts = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
             base = f"cinema_{ts}_{idx}"
             safe_name = await save_upload(file_field, ROOT_DIR / "data", base_name=base)
             if not safe_name:
@@ -1016,11 +1016,11 @@ async def delete_event(
 
 @app.get("/metrics", response_class=HTMLResponse)
 async def web_metrics(request: Request, metrics = Depends(get_metrics_service), _: None = Depends(verify_web_auth)):
-    overview = metrics.today_overview()
-    daily = metrics.daily_summaries(days=14)
-    retention = metrics.retention_next_day(days=14)
-    features = metrics.feature_usage(days=14, top_n=50)
-    demographics = metrics.demographics()
+    overview = await metrics.today_overview()
+    daily = await metrics.daily_summaries(days=14)
+    retention = await metrics.retention_next_day(days=14)
+    features = await metrics.feature_usage(days=14, top_n=50)
+    demographics = await metrics.demographics()
     return templates.TemplateResponse("metrics.html", {
         "request": request,
         "overview": overview,
@@ -1043,7 +1043,7 @@ async def web_bookings_delete(
     if booking_id:
         logger.info("Web: bookings/delete id=%s", booking_id)
         try:
-            calendar_service.admin_delete_booking(booking_id)
+            await calendar_service.admin_delete_booking(booking_id)
         except Exception:
             # Ignore errors for idempotency
             pass
@@ -1072,7 +1072,7 @@ def parse_title_code_lines(text: str) -> list[dict]:
 
 
 
-def compute_new_bookings_today(
+async def compute_new_bookings_today(
     bookings: Optional[list[dict]] = None,
     now: Optional[datetime] = None,
     calendar_service: Optional[CalendarService] = None,
@@ -1087,11 +1087,11 @@ def compute_new_bookings_today(
     try:
         if bookings is None:
             svc = calendar_service or container.calendar_service()
-            raw_bookings = svc.list_all_bookings()
+            raw_bookings = await svc.list_all_bookings()
         else:
             raw_bookings = bookings
         if raw_bookings:
-            today_utc = ((now or datetime.utcnow()).date())
+            today_utc = ((now or datetime.now(timezone.utc)).date())
             for b in raw_bookings:
                 created = b.get('created_at') or b.get('created')
                 if isinstance(created, str) and created:

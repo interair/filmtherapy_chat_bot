@@ -1,57 +1,118 @@
 {% extends "base.html" %}
 {% block title %}Add New Event{% endblock %}
 {% block content %}
-  <h1>➕ Add New Event</h1>
-  <a href="/events" class="button">← Back to Events</a>
+  <div class="mb-8">
+    <a href="/events" class="inline-flex items-center text-sm font-medium text-slate-500 hover:text-primary-600 transition-colors mb-4 group">
+      <i data-lucide="arrow-left" class="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform"></i>
+      Back to Events
+    </a>
+    <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+      Create New Event
+    </h1>
+    <p class="text-slate-500 dark:text-slate-400 mt-1">Fill in the details to publish a new event to the bot poster.</p>
+  </div>
 
-  <div class="card">
-    <form method="post" action="/events/save" enctype="multipart/form-data">
-      <div class="form-group">
-        <label for="title">Event Title:</label>
-        <input type="text" id="title" name="title" required placeholder="e.g., Киноклуб: Inception" title="Public name of the event shown to users">
-        <small class="muted">Keep it short and descriptive. Emojis are supported.</small>
+  <div class="max-w-3xl">
+    <form method="post" action="/events/save" enctype="multipart/form-data" class="space-y-6">
+      <div class="card p-8">
+        <div class="grid grid-cols-1 gap-6">
+          <!-- Title -->
+          <div>
+            <label for="title" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+              <i data-lucide="type" class="w-4 h-4 text-primary-500"></i>
+              Event Title
+            </label>
+            <input type="text" id="title" name="title" required placeholder="e.g., Киноклуб: Inception" class="input-field" title="Public name of the event shown to users">
+            <p class="mt-2 text-xs text-slate-500 italic">Keep it short and descriptive. Emojis are supported.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Date & Time -->
+            <div>
+              <label for="when" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <i data-lucide="calendar" class="w-4 h-4 text-primary-500"></i>
+                Date & Time
+              </label>
+              <input type="datetime-local" id="when" name="when" required class="input-field" title="Local date and time when the event starts">
+              <p class="mt-2 text-xs text-slate-500">Local time for your users.</p>
+            </div>
+
+            <!-- Price -->
+            <div>
+              <label for="price" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <i data-lucide="banknote" class="w-4 h-4 text-primary-500"></i>
+                Price (Optional)
+              </label>
+              <div class="relative">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                <input type="number" id="price" name="price" step="0.01" placeholder="0.00" class="input-field pl-8" title="Ticket price">
+              </div>
+              <p class="mt-2 text-xs text-slate-500">Leave empty for free events.</p>
+            </div>
+          </div>
+
+          <!-- Location -->
+          <div>
+            <label for="place" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+              <i data-lucide="map-pin" class="w-4 h-4 text-primary-500"></i>
+              Location
+            </label>
+            <input type="text" id="place" name="place" list="locs" required placeholder="e.g., IJsbaanpad 9" class="input-field" title="Address or venue name">
+            <datalist id="locs">
+              {% for s in locs %}<option value="{{ s }}">{% endfor %}
+            </datalist>
+            <p class="mt-2 text-xs text-slate-500">Pick from suggestions or type a new address.</p>
+          </div>
+
+          <!-- Description -->
+          <div>
+            <label for="description" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+              <i data-lucide="align-left" class="w-4 h-4 text-primary-500"></i>
+              Description (Optional)
+            </label>
+            <textarea id="description" name="description" rows="5" placeholder="Tell users more about this event..." class="input-field resize-none" title="Extra details users will see"></textarea>
+          </div>
+
+          <!-- Photo -->
+          <div>
+            <label for="photo" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+              <i data-lucide="image" class="w-4 h-4 text-primary-500"></i>
+              Cover Photo (Optional)
+            </label>
+            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-200 dark:border-slate-700 border-dashed rounded-2xl hover:border-primary-400 dark:hover:border-primary-500/50 transition-colors cursor-pointer group" onclick="document.getElementById('photo').click()">
+              <div class="space-y-1 text-center">
+                <i data-lucide="upload-cloud" class="mx-auto h-12 w-12 text-slate-400 group-hover:text-primary-500 transition-colors"></i>
+                <div class="flex text-sm text-slate-600 dark:text-slate-400">
+                  <span class="relative font-medium text-primary-600 dark:text-primary-400">Upload a file</span>
+                  <p class="pl-1">or drag and drop</p>
+                </div>
+                <p class="text-xs text-slate-500">
+                  PNG, JPG, WEBP up to 10MB
+                </p>
+              </div>
+              <input type="file" id="photo" name="photo" accept="image/*" class="hidden">
+            </div>
+            <div id="photo-preview" class="hidden mt-4 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 max-h-48">
+                <img src="" id="preview-img" class="w-full h-full object-cover">
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="when">Date & Time:</label>
-        <input type="datetime-local" id="when" name="when" required title="Local date and time when the event starts">
-        <small class="muted">Set in your local timezone. Users will see local time in the bot.</small>
+      <div class="flex items-center gap-4 pt-4">
+        <button type="submit" class="btn btn-primary !px-10">
+          <i data-lucide="save" class="w-4 h-4"></i> Save Event
+        </button>
+        <a href="/events" class="btn btn-secondary">
+          Cancel
+        </a>
       </div>
-
-      <div class="form-group">
-        <label for="place">Location:</label>
-        <input type="text" id="place" name="place" list="locs" required placeholder="e.g., IJsbaanpad 9" title="Address or venue name where the event is held">
-        <datalist id="locs">
-          {% for s in locs %}<option value="{{ s }}">{% endfor %}
-        </datalist>
-        <small class="muted">Pick from suggestions or type a new address.</small>
-      </div>
-
-      <div class="form-group">
-        <label for="price">Price:</label>
-        <input type="number" id="price" name="price" step="0.01" placeholder="15.00" title="Ticket price in your default currency">
-        <small class="muted">Leave empty for free events.</small>
-      </div>
-
-      <div class="form-group">
-        <label for="description">Description (optional):</label>
-        <textarea id="description" name="description" rows="4" placeholder="Additional event details..." title="Extra details users will see in the bot"></textarea>
-        <small class="muted">Add speaker info, agenda, languages, or any special notes.</small>
-      </div>
-
-      <div class="form-group">
-        <label for="photo">Event Photo (optional):</label>
-        <input type="file" id="photo" name="photo" accept="image/*" title="Upload an image to show in the bot and web">
-        <small class="muted">Accepted: JPG, PNG, WEBP. Up to 10 MB.</small>
-      </div>
-
-      <button type="submit" class="button success" title="Save this event">💾 Save Event</button>
-      <a href="/events" class="button" title="Discard changes and go back">Cancel</a>
     </form>
   </div>
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+      // Default time: tomorrow at 19:00
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(19, 0, 0, 0);
@@ -65,6 +126,23 @@
         const mm = pad(tomorrow.getMinutes());
         el.value = `${y}-${m}-${d}T${hh}:${mm}`;
       }
+
+      // Photo preview
+      const photoInput = document.getElementById('photo');
+      const preview = document.getElementById('photo-preview');
+      const previewImg = document.getElementById('preview-img');
+      
+      photoInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            preview.classList.remove('hidden');
+          }
+          reader.readAsDataURL(file);
+        }
+      });
     });
   </script>
 {% endblock %}

@@ -177,7 +177,7 @@ class BookingStates(StatesGroup):
 
 @router.message(F.text.in_({"Записаться на консультацию", "Book a consultation", "🗓️ Записаться на консультацию", "🗓️ Book a consultation"}))
 async def book_entry(message: Message, state: FSMContext) -> None:
-    lang = user_lang(message)
+    lang = await user_lang(message)
     logger.info("Booking: entry user=%s", getattr(message.from_user, "id", None))
     types = SESSION_TYPES
     rows = [[(_stype_label(stype), f"type:{stype}")] for stype in types]
@@ -187,7 +187,7 @@ async def book_entry(message: Message, state: FSMContext) -> None:
 
 @router.message(F.text.in_({"Онлайн-сессия", "Online session", "💻 Онлайн-сессия", "💻 Online session"}))
 async def online_entry(message: Message, state: FSMContext) -> None:
-    lang = user_lang(message)
+    lang = await user_lang(message)
     await state.set_state(BookingStates.choosing_type)
     await state.update_data(session_type="Онлайн", location=None)
     # Immediately go to dates for online sessions
@@ -230,7 +230,7 @@ async def _get_locations_list(session_type: str | None) -> list[str]:
 
 
 async def show_locations(cb: CallbackQuery, state: FSMContext):
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     data = await state.get_data()
     stype = data.get("session_type") if isinstance(data, dict) else None
     locs = await _get_locations_list(str(stype) if stype else None)
@@ -278,7 +278,7 @@ def _build_dates_rows(dates: list[str], page: int, stype_code: str, loc_code: st
 
 
 async def show_dates(event: Message | CallbackQuery, state: FSMContext):
-    lang = user_lang(event)
+    lang = await user_lang(event)
     data = await state.get_data()
 
     session_type = data.get("session_type")
@@ -343,11 +343,11 @@ async def paginate_dates(cb: CallbackQuery, state: FSMContext) -> None:
             dates = []
     rows = _build_dates_rows(dates or [], page=page, stype_code=st_code, loc_code=loc_code)
     await state.set_state(BookingStates.choosing_date)
+    lang = await user_lang(cb)
     try:
-        await cb.message.edit_text(t(user_lang(cb), "book.choose_date"), reply_markup=ik_kbd(rows))
+        await cb.message.edit_text(t(lang, "book.choose_date"), reply_markup=ik_kbd(rows))
     except Exception:
-        logger.debug("edit_text failed in paginate_dates; falling back to answer", exc_info=True)
-        await cb.message.answer(t(user_lang(cb), "book.choose_date"), reply_markup=ik_kbd(rows))
+        await cb.message.answer(t(lang, "book.choose_date"), reply_markup=ik_kbd(rows))
 
 
 @router.callback_query(F.data == "noop")
@@ -384,7 +384,7 @@ async def choose_date(cb: CallbackQuery, state: FSMContext) -> None:
 
 
 async def show_times(cb: CallbackQuery, state: FSMContext):
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     data = await state.get_data()
     date = data.get("date")
     stype = data.get("session_type")
@@ -432,7 +432,7 @@ async def show_times(cb: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("time:"))
 async def choose_time(cb: CallbackQuery, state: FSMContext) -> None:
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     parts = (cb.data or "").split(":")
     if len(parts) < 5:
         await cb.answer(t(lang, "error.invalid_datetime"), show_alert=True)
@@ -483,13 +483,13 @@ async def choose_time(cb: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("pay:"))
 async def pay(cb: CallbackQuery) -> None:
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     booking_id = cb.data.split(":", 1)[1] if isinstance(cb.data, str) else ""
     repo = container.booking_repository()
 
     # Resolve booking and session type
     try:
-        booking = repo.get_by_id_sync(booking_id) if booking_id else None
+        booking = await repo.get_by_id_raw(booking_id) if booking_id else None
     except Exception as e:
         logger.error("Failed to fetch booking id=%s: %s", booking_id, e, exc_info=True)
         booking = None
@@ -500,7 +500,7 @@ async def pay(cb: CallbackQuery) -> None:
     price_val = _get_price(lang, suffix)
     try:
         if booking_id:
-            repo.patch_sync(booking_id, {"price": float(price_val)})
+            await repo.patch_raw(booking_id, {"price": float(price_val)})
     except Exception as e:
         logger.warning("Failed to update price for booking id=%s: %s", booking_id, e)
 
@@ -523,10 +523,10 @@ async def pay(cb: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("cancel:"))
 async def cancel_booking(cb: CallbackQuery) -> None:
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     booking_id = cb.data.split(":", 1)[1]
     try:
-        container.calendar_service().cancel_booking(booking_id)
+        await container.calendar_service().cancel_booking(booking_id)
         await cb.message.edit_text(t(lang, "book.canceled"))
     except PermissionError:
         await cb.answer(t(lang, "book.cannot_cancel"), show_alert=True)
@@ -535,7 +535,7 @@ async def cancel_booking(cb: CallbackQuery) -> None:
 
 @router.message(F.text.in_({"Мои записи", "My bookings", "📒 Мои записи", "📒 My bookings"}))
 async def my_bookings(message: Message) -> None:
-    lang = user_lang(message)
+    lang = await user_lang(message)
     uid = message.from_user.id if message and message.from_user else None
     if not uid:
         return
@@ -568,7 +568,7 @@ async def my_bookings(message: Message) -> None:
     # Collect session bookings (consultations)
     session_items = []
     try:
-        session_items = container.calendar_service().list_user_bookings(uid) or []
+        session_items = await container.calendar_service().list_user_bookings(uid) or []
     except Exception as e:
         logger.error("Failed to fetch user bookings for user_id=%s: %s", uid, e, exc_info=True)
         session_items = []

@@ -3,219 +3,190 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% block title %}Admin{% endblock %}</title>
+  <title>{% block title %}Admin{% endblock %} | gantich</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
   <link rel="shortcut icon" href="/static/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css">
-  <style>
-    :root {
-      /* Default to LIGHT theme with softer feminine palette */
-      --bg-1: #fff7fb; /* blush 50 */
-      --bg-2: #fdf2f8; /* pink 50 */
-      --panel: rgba(255, 255, 255, 0.8);
-      --panel-border: rgba(0, 0, 0, 0.06);
-      --text: #0f172a; /* slate-900 */
-      --text-muted: #475569; /* slate-600 */
-      --primary: #ec4899; /* pink-500 */
-      --primary-2: #f9a8d4; /* pink-300 */
-      --success: #10b981; /* emerald-500 */
-      --danger: #ef4444; /* red-500 */
-      --warning: #f59e0b; /* amber-500 */
-      --radius: 16px;
-      --shadow-1: 0 10px 30px rgba(0,0,0,.28);
-      --shadow-2: 0 6px 20px rgba(236, 72, 153, .35);
-      /* Alerts (light) */
-      --alert-bg: rgba(16, 185, 129, 0.12);
-      --alert-border: rgba(16, 185, 129, 0.45);
-      --alert-text: #065f46; /* emerald-800 */
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    // Custom configuration to extend Tailwind
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#fff1f2',
+              100: '#ffe4e6',
+              200: '#fecdd3',
+              300: '#fda4af',
+              400: '#fb7185',
+              500: '#f43f5e',
+              600: '#e11d48',
+              700: '#be123c',
+              800: '#9f1239',
+              900: '#881337',
+              950: '#4c0519',
+            },
+          },
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
     }
-
-    /* Light theme */
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg-1: #fff7fb; /* blush 50 */
-        --bg-2: #fdf2f8; /* pink 50 */
-        --panel: rgba(255, 255, 255, 0.8);
-        --panel-border: rgba(0, 0, 0, 0.06);
-        --text: #0f172a; /* slate-900 */
-        --text-muted: #475569; /* slate-600 */
+  </script>
+  <style type="text/tailwindcss">
+    @layer base {
+      body {
+        @apply bg-[#fff7fb] text-slate-900 transition-colors duration-300;
+      }
+      .dark body {
+        @apply bg-[#0f172a] text-slate-200;
       }
     }
 
-    /* Force dark when toggled */
-    html[data-theme="dark"] {
-      --bg-1: #0f172a;
-      --bg-2: #111827;
-      --panel: rgba(17, 24, 39, 0.6);
-      --panel-border: rgba(255, 255, 255, 0.08);
-      --text: #e5e7eb;
-      --text-muted: #9ca3af;
-      /* Alerts (dark) */
-      --alert-bg: rgba(16, 185, 129, 0.16);
-      --alert-border: rgba(16, 185, 129, 0.55);
-      --alert-text: #d1fae5; /* emerald-100 */
+    @layer components {
+      .glass {
+        @apply backdrop-blur-md border border-white/20;
+      }
+      .card {
+        @apply bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/50 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden;
+      }
+      .nav-link {
+        @apply flex items-center gap-2 px-4 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-all duration-200 text-sm font-medium;
+      }
+      .nav-link.active {
+        @apply bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300;
+      }
+      .btn {
+        @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-sm;
+      }
+      .btn-primary {
+        @apply bg-primary-600 hover:bg-primary-700 text-white shadow-lg shadow-primary-500/25;
+      }
+      .btn-secondary {
+        @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50;
+      }
+      .btn-danger {
+        @apply bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/25;
+      }
+      .input-field {
+        @apply w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all duration-200 text-sm;
+      }
+      .badge {
+        @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+      }
     }
-
-    /* Force light when toggled */
-    html[data-theme="light"] {
-      --bg-1: #fff7fb; /* blush 50 */
-      --bg-2: #fdf2f8; /* pink 50 */
-      --panel: rgba(255, 255, 255, 0.8);
-      --panel-border: rgba(0, 0, 0, 0.06);
-      --text: #0f172a; /* slate-900 */
-      --text-muted: #475569; /* slate-600 */
-      /* Alerts (light) */
-      --alert-bg: rgba(16, 185, 129, 0.12);
-      --alert-border: rgba(16, 185, 129, 0.45);
-      --alert-text: #065f46; /* emerald-800 */
-    }
-
-    html, body { height: 100%; }
-    body {
-      font-family: Poppins, Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-      margin: 0; color: var(--text);
-      background: radial-gradient(1200px 600px at 0% -10%, rgba(236,72,153,.22), transparent 60%),
-                  radial-gradient(1000px 600px at 100% 10%, rgba(167,139,250,.18), transparent 60%),
-                  linear-gradient(180deg, var(--bg-1), var(--bg-2));
-      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-    }
-
-    .container { max-width: 1200px; padding: 24px; margin: 0 auto; }
-
-    /* Navbar */
-    .navbar {
-      position: sticky; top: 0; z-index: 1000;
-      backdrop-filter: saturate(160%) blur(10px);
-      background: linear-gradient(180deg, rgba(17,24,39,.85), rgba(17,24,39,.65));
-      border-bottom: 1px solid var(--panel-border);
-      box-shadow: var(--shadow-1);
-    }
-    .nav-inner { display: flex; align-items: center; gap: 16px; justify-content: space-between; max-width: 1200px; margin: 0 auto; padding: 14px 24px; }
-    .brand { color: white; text-decoration: none; font-weight: 700; letter-spacing: .2px; display: inline-flex; align-items: center; gap: 10px; }
-    .brand::after { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: linear-gradient(135deg, var(--primary), var(--primary-2)); box-shadow: 0 0 18px rgba(124,58,237,.8); }
-    .nav a { color: rgba(255,255,255,0.92); text-decoration: none; padding: 8px 12px; border-radius: 10px; opacity: .95; }
-    .nav a:hover { background: rgba(255,255,255,.12); opacity: 1; }
-    .nav { display: flex; flex-wrap: wrap; gap: 6px; }
-
-    /* Improve contrast of outline buttons in dark navbar */
-    .navbar .button.outline { color: #fff; border-color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.06); }
-    .navbar .button.outline:hover { background: rgba(255,255,255,0.12); }
-
-    /* Panels */
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin: 20px 0;
-      box-shadow: var(--shadow-1);
-    }
-
-    /* Headings */
-    h1, h2, h3, h4 { margin: 0 0 12px; line-height: 1.2; }
-    h1 { font-size: 1.8rem; }
-    h2 { font-size: 1.3rem; color: var(--text-muted); font-weight: 600; }
-
-    /* Buttons */
-    .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; margin: 6px; border-radius: 12px; border: 1px solid transparent; color: white; text-decoration: none; cursor: pointer; background: linear-gradient(135deg, var(--primary), var(--primary-2)); box-shadow: var(--shadow-2); transition: transform .12s ease, box-shadow .2s ease, filter .2s ease; }
-    .button:hover { transform: translateY(-1px); filter: brightness(1.05); }
-    .button:active { transform: translateY(0); filter: brightness(.98); }
-    .button.success { background: linear-gradient(135deg, var(--success), #34d399); box-shadow: 0 8px 18px rgba(16,185,129,.35); }
-    .button.danger { background: linear-gradient(135deg, var(--danger), #f87171); box-shadow: 0 8px 18px rgba(239,68,68,.35); }
-    .button.outline { background: transparent; color: var(--text); border: 1px solid var(--panel-border); box-shadow: none; }
-    .button.outline:hover { background: rgba(255,255,255,.06); }
-
-    /* Alerts */
-    .alert { background: var(--alert-bg); border: 1px solid var(--alert-border); color: var(--alert-text); padding: 12px 14px; margin: 10px 0; border-radius: 12px; font-weight: 600; }
-    .alert a:not(.button) { color: inherit; text-decoration: underline; font-weight: 700; }
-
-    /* Status badges */
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: .85rem; font-weight: 600; }
-    .status-green { color: #22c55e; }
-    .status-orange { color: #f59e0b; }
-
-    /* Tables */
-    table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 12px; }
-    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--panel-border); }
-    th { background: rgba(255,255,255,.06); color: var(--text-muted); font-weight: 600; }
-    tr:hover td { background: rgba(255,255,255,.03); }
-
-    /* Forms */
-    .form-group { margin: 16px 0; }
-    label { font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-muted); }
-    input, textarea, select { width: 100%; padding: 10px 12px; margin: 4px 0; border: 1px solid var(--panel-border); border-radius: 12px; font: inherit; color: var(--text); background: rgba(255,255,255,.06); outline: none; transition: box-shadow .2s ease, border-color .2s ease, background .2s ease; }
-    input:focus, textarea:focus, select:focus { border-color: rgba(236,72,153,.6); box-shadow: 0 0 0 4px rgba(236,72,153,.18); background: rgba(255,255,255,.1); }
-    textarea { resize: vertical; }
-
-    /* Event items */
-    .event-item { border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 16px; margin: 12px 0; background: rgba(255,255,255,.04); box-shadow: var(--shadow-1); }
-
-    /* Footer */
-    footer { color: var(--text-muted); padding: 24px; text-align: center; }
-
-    /* Utility */
-    .muted { color: var(--text-muted); }
   </style>
 </head>
-<body>
-  <header class="navbar">
-    <div class="nav-inner">
-      <a class="brand" href="/">🎬 gantich-chat-bot</a>
-      <nav class="nav">
-        <a href="/" title="Overview and quick actions">Dashboard</a>
-        <a href="/events" title="Create, edit, and delete events">Events</a>
-        <a href="/locations" title="Manage event locations">Locations</a>
-        <a href="/quiz" title="Configure quiz questions and answers">Quiz</a>
-        <a href="/bookings" title="Review and manage user bookings">Bookings</a>
-        <a href="/schedule" title="Configure recurrent schedule for bookings">Schedule</a>
-        <a href="/i18n" title="Edit texts and translations">Translations</a>
-        <a href="/about" title="Edit About page and contacts">About</a>
+<body class="min-h-screen flex flex-col font-sans">
+  <!-- Navbar -->
+  <header class="sticky top-0 z-50 glass bg-white/70 dark:bg-slate-900/70 border-b border-slate-200/60 dark:border-slate-800/60">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center gap-8">
+          <a href="/" class="flex items-center gap-2 group">
+            <div class="w-10 h-10 bg-gradient-to-tr from-primary-600 to-rose-400 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/20 group-hover:scale-105 transition-transform duration-200">
+              <i data-lucide="bot" class="text-white w-6 h-6"></i>
+            </div>
+            <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300">gantich</span>
+          </a>
+          
+          <nav class="hidden md:flex items-center gap-1">
+            <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">
+              <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+            </a>
+            <a href="/events" class="nav-link {% if request.url.path.startswith('/events') %}active{% endif %}">
+              <i data-lucide="calendar" class="w-4 h-4"></i> Events
+            </a>
+            <a href="/bookings" class="nav-link {% if request.url.path.startswith('/bookings') %}active{% endif %}">
+              <i data-lucide="clipboard-list" class="w-4 h-4"></i> Bookings
+            </a>
+          </nav>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button id="themeToggle" class="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors duration-200" aria-label="Toggle theme">
+            <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
+            <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+          </button>
+          
+          <!-- Mobile Menu Toggle -->
+          <button id="mobileMenuToggle" class="md:hidden p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors duration-200">
+            <i data-lucide="menu" class="w-6 h-6"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Mobile Navigation -->
+    <div id="mobileMenu" class="hidden md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+      <nav class="flex flex-col gap-2">
+        <a href="/" class="nav-link">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+        </a>
+        <a href="/events" class="nav-link">
+          <i data-lucide="calendar" class="w-4 h-4"></i> Events
+        </a>
+        <a href="/locations" class="nav-link">
+          <i data-lucide="map-pin" class="w-4 h-4"></i> Locations
+        </a>
+        <a href="/quiz" class="nav-link">
+          <i data-lucide="help-circle" class="w-4 h-4"></i> Quiz
+        </a>
+        <a href="/bookings" class="nav-link">
+          <i data-lucide="clipboard-list" class="w-4 h-4"></i> Bookings
+        </a>
+        <a href="/schedule" class="nav-link">
+          <i data-lucide="clock" class="w-4 h-4"></i> Schedule
+        </a>
+        <a href="/i18n" class="nav-link">
+          <i data-lucide="languages" class="w-4 h-4"></i> Translations
+        </a>
+        <a href="/about" class="nav-link">
+          <i data-lucide="info" class="w-4 h-4"></i> About
+        </a>
       </nav>
-      <button id="themeToggle" class="button outline" title="Toggle theme" aria-label="Toggle theme">🌓</button>
     </div>
   </header>
-  <main class="container">
+
+  <main class="flex-grow container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {% block content %}{% endblock %}
   </main>
-  <footer>
-    <div class="container muted">Admin Panel • Powered by FastAPI · Jinja2</div>
+
+  <footer class="border-t border-slate-200 dark:border-slate-800 py-8 bg-white/50 dark:bg-slate-900/50 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 text-center">
+      <p class="text-sm text-slate-500 dark:text-slate-400">
+        gantich admin panel &bull; powered by FastAPI & Jinja2
+      </p>
+    </div>
   </footer>
+
   <script>
+    // Theme logic
     (function() {
-      try {
-        const key = 'admin-theme';
-        const root = document.documentElement;
-        const current = localStorage.getItem(key);
-        if (current === 'dark') {
-          root.setAttribute('data-theme', 'dark');
-        } else if (current === 'light') {
-          root.setAttribute('data-theme', 'light');
-        } else {
-          // Default to light
-          root.setAttribute('data-theme', 'light');
-          localStorage.setItem(key, 'light');
-        }
-        const btn = document.getElementById('themeToggle');
-        if (btn) {
-          btn.title = (root.getAttribute('data-theme') === 'dark') ? 'Switch to light theme' : 'Switch to dark theme';
-          btn.addEventListener('click', function() {
-            const isDark = root.getAttribute('data-theme') === 'dark';
-            if (isDark) {
-              root.setAttribute('data-theme', 'light');
-              localStorage.setItem(key, 'light');
-              btn.title = 'Switch to dark theme';
-            } else {
-              root.setAttribute('data-theme', 'dark');
-              localStorage.setItem(key, 'dark');
-              btn.title = 'Switch to light theme';
-            }
-          });
-        }
-      } catch(e) { /* ignore */ }
+      const theme = localStorage.getItem('admin-theme') || 'light';
+      if (theme === 'dark') document.documentElement.classList.add('dark');
+      
+      const toggle = document.getElementById('themeToggle');
+      toggle.addEventListener('click', () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('admin-theme', isDark ? 'dark' : 'light');
+      });
+
+      // Mobile menu logic
+      const menuBtn = document.getElementById('mobileMenuToggle');
+      const menu = document.getElementById('mobileMenu');
+      menuBtn.addEventListener('click', () => {
+        menu.classList.toggle('hidden');
+      });
+
+      // Initialize Lucide icons
+      lucide.createIcons();
     })();
   </script>
 </body>

@@ -122,7 +122,7 @@ async def _send_about_photos(msg: Message) -> None:
     or Telegram constraints), sends photos one by one.
     """
     try:
-        items = container.about_repository().list_cinema_photos()
+        items = await container.about_repository().list_cinema_photos()
     except Exception:
         items = []
 
@@ -149,7 +149,7 @@ async def _send_about_photos(msg: Message) -> None:
 # Main Film club button -> show submenu
 @router.message(F.text.in_({"Киноклуб", "Film club", "🎬 Киноклуб", "🎬 Film club"}))
 async def film_club_menu(message: Message, state: FSMContext) -> None:
-    lang = user_lang(message)
+    lang = await user_lang(message)
     title = ("🎬 " + t(lang, "menu.cinema")) if (lang or "ru").startswith("ru") else ("🎬 " + t(lang, "menu.cinema"))
     await state.set_state(CinemaStates.menu)
     await message.answer(title, reply_markup=cinema_menu(lang))
@@ -158,7 +158,7 @@ async def film_club_menu(message: Message, state: FSMContext) -> None:
 # Schedule button -> previous behavior
 @router.message(F.text.in_({"Расписание", "🗓️ Расписание", "Schedule", "🗓️ Schedule"}))
 async def film_club_schedule(message: Message) -> None:
-    lang = user_lang(message)
+    lang = await user_lang(message)
     poster = await container.event_repository().get_upcoming()
     if not poster:
         await message.answer(t(lang, "cinema.poster"))
@@ -182,7 +182,7 @@ async def film_club_schedule(message: Message) -> None:
 # About Film club -> send text + media group
 @router.message(F.text.in_({"О киноклубе", "ℹ️ О киноклубе", "About the Film Club", "ℹ️ About the Film Club"}))
 async def film_club_about(message: Message) -> None:
-    lang = user_lang(message)
+    lang = await user_lang(message)
     # First send the about text (editable via /i18n)
     about_text = t(lang, "cinema.about_text")
     await message.answer(about_text)
@@ -200,7 +200,7 @@ async def film_club_about(message: Message) -> None:
 
 @router.callback_query(F.data == "cinema:about")
 async def cb_cinema_about(cb: CallbackQuery) -> None:
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     about_text = t(lang, "cinema.about_text")
     # Send text first
     await cb.message.answer(about_text)
@@ -218,7 +218,7 @@ async def cb_cinema_about(cb: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "cinema:schedule")
 async def cb_cinema_schedule(cb: CallbackQuery) -> None:
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     poster = await container.event_repository().get_upcoming()
     if not poster:
         await cb.message.answer(t(lang, "cinema.poster"))
@@ -242,7 +242,7 @@ async def cb_cinema_schedule(cb: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("reg:"))
 async def register_film(cb: CallbackQuery) -> None:
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     event_id = cb.data.split(":", 1)[1]
     uid = cb.from_user.id if cb and cb.from_user else None
     name = cb.from_user.full_name if cb and cb.from_user else ""
@@ -271,7 +271,7 @@ async def register_film(cb: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("pay_event:"))
 async def pay_event(cb: CallbackQuery) -> None:
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     event_id = cb.data.split(":", 1)[1] if isinstance(cb.data, str) else ""
     # Resolve event price or fallback to i18n-configured cinema price
     price_val: float | None = None
@@ -330,7 +330,7 @@ async def pay_event(cb: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("cancel_event:"))
 async def cancel_event(cb: CallbackQuery) -> None:
-    lang = user_lang(cb)
+    lang = await user_lang(cb)
     event_id = cb.data.split(":", 1)[1]
     uid = cb.from_user.id if cb and cb.from_user else None
     if not uid:
