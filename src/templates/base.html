@@ -106,10 +106,31 @@
             <a href="/bookings" class="nav-link {% if request.url.path.startswith('/bookings') %}active{% endif %}">
               <i data-lucide="clipboard-list" class="w-4 h-4"></i> Bookings
             </a>
+            <a href="/locations" class="nav-link {% if request.url.path.startswith('/locations') %}active{% endif %}">
+              <i data-lucide="map-pin" class="w-4 h-4"></i> Locations
+            </a>
+            <a href="/schedule" class="nav-link {% if request.url.path.startswith('/schedule') %}active{% endif %}">
+              <i data-lucide="clock" class="w-4 h-4"></i> Schedule
+            </a>
+            <a href="/quiz" class="nav-link {% if request.url.path.startswith('/quiz') %}active{% endif %}">
+              <i data-lucide="help-circle" class="w-4 h-4"></i> Quiz
+            </a>
+            <a href="/i18n" class="nav-link {% if request.url.path.startswith('/i18n') %}active{% endif %}">
+              <i data-lucide="languages" class="w-4 h-4"></i> Translations
+            </a>
+            <a href="/about" class="nav-link {% if request.url.path.startswith('/about') %}active{% endif %}">
+              <i data-lucide="info" class="w-4 h-4"></i> About
+            </a>
           </nav>
         </div>
 
         <div class="flex items-center gap-3">
+          <a href="/metrics" class="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors duration-200" title="Metrics">
+            <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+          </a>
+          <a href="/system" class="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors duration-200" title="System">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+          </a>
           <button id="themeToggle" class="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors duration-200" aria-label="Toggle theme">
             <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
             <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
@@ -126,29 +147,35 @@
     <!-- Mobile Navigation -->
     <div id="mobileMenu" class="hidden md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
       <nav class="flex flex-col gap-2">
-        <a href="/" class="nav-link">
+        <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">
           <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
         </a>
-        <a href="/events" class="nav-link">
+        <a href="/events" class="nav-link {% if request.url.path.startswith('/events') %}active{% endif %}">
           <i data-lucide="calendar" class="w-4 h-4"></i> Events
         </a>
-        <a href="/locations" class="nav-link">
+        <a href="/locations" class="nav-link {% if request.url.path.startswith('/locations') %}active{% endif %}">
           <i data-lucide="map-pin" class="w-4 h-4"></i> Locations
         </a>
-        <a href="/quiz" class="nav-link">
+        <a href="/quiz" class="nav-link {% if request.url.path.startswith('/quiz') %}active{% endif %}">
           <i data-lucide="help-circle" class="w-4 h-4"></i> Quiz
         </a>
-        <a href="/bookings" class="nav-link">
+        <a href="/bookings" class="nav-link {% if request.url.path.startswith('/bookings') %}active{% endif %}">
           <i data-lucide="clipboard-list" class="w-4 h-4"></i> Bookings
         </a>
-        <a href="/schedule" class="nav-link">
+        <a href="/schedule" class="nav-link {% if request.url.path.startswith('/schedule') %}active{% endif %}">
           <i data-lucide="clock" class="w-4 h-4"></i> Schedule
         </a>
-        <a href="/i18n" class="nav-link">
+        <a href="/i18n" class="nav-link {% if request.url.path.startswith('/i18n') %}active{% endif %}">
           <i data-lucide="languages" class="w-4 h-4"></i> Translations
         </a>
-        <a href="/about" class="nav-link">
+        <a href="/about" class="nav-link {% if request.url.path.startswith('/about') %}active{% endif %}">
           <i data-lucide="info" class="w-4 h-4"></i> About
+        </a>
+        <a href="/metrics" class="nav-link {% if request.url.path.startswith('/metrics') %}active{% endif %}">
+          <i data-lucide="bar-chart-2" class="w-4 h-4"></i> Metrics
+        </a>
+        <a href="/system" class="nav-link {% if request.url.path.startswith('/system') %}active{% endif %}">
+          <i data-lucide="settings" class="w-4 h-4"></i> System
         </a>
       </nav>
     </div>
