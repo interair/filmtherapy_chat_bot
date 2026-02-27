@@ -125,10 +125,10 @@
         </div>
 
         <div class="flex items-center gap-3">
-          <a href="/metrics" class="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors duration-200" title="Metrics">
+          <a href="/metrics" class="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors duration-200 {% if request.url.path.startswith('/metrics') %}bg-slate-100 dark:bg-slate-800 text-primary-600 dark:text-primary-400{% endif %}" title="Metrics">
             <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
           </a>
-          <a href="/system" class="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors duration-200" title="System">
+          <a href="/system" class="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors duration-200 {% if request.url.path.startswith('/system') %}bg-slate-100 dark:bg-slate-800 text-primary-600 dark:text-primary-400{% endif %}" title="System">
             <i data-lucide="settings" class="w-5 h-5"></i>
           </a>
           <button id="themeToggle" class="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors duration-200" aria-label="Toggle theme">
