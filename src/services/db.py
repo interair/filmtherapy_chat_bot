@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Callable, Optional
 
 from google.cloud import firestore
+from google.cloud.firestore_v1.async_transaction import async_transactional
 
 from .firestore_client import get_async_client
 
@@ -29,14 +31,18 @@ class DB:
 
     # Transactions
     async def run_transaction(self, func: Callable[[firestore.AsyncTransaction], Any]) -> Any:
-        tx = self._client.transaction()
-        # Use context manager API compatible with google-cloud-firestore v2+
+        @async_transactional
+        async def _wrapper(tx: firestore.AsyncTransaction) -> Any:
+            # Handle both async and sync functions if needed
+            res = func(tx)
+            if asyncio.iscoroutine(res):
+                return await res
+            return res
+
         try:
-            async with tx:
-                return await func(tx)
+            return await _wrapper(self._client.transaction())
         except Exception:
             logger.exception("Firestore transaction failed")
-            # Context manager will handle rollback automatically where applicable
             raise
 
     # Array operations
