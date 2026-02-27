@@ -1,36 +1,40 @@
-FROM python:3.13-slim AS base
+# Stage 1: Build
+FROM python:3.13-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir --prefer-binary -r requirements.txt
+
+# Stage 2: Final
+FROM python:3.13-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONOPTIMIZE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONPATH="/app" \
-    PYTHONNOUSERSITE=1 \
     APP_PROFILE_STARTUP=0
 
-# Create user and workdir in one layer
-RUN useradd -m -u 10001 appuser && mkdir -p /app
 WORKDIR /app
+RUN useradd -m -u 10001 appuser && mkdir -p logs data && chown -R appuser:appuser /app
 
-# Install dependencies with optimizations
-COPY requirements.txt ./
-RUN python -m pip install --no-cache-dir --prefer-binary -r requirements.txt \
-    && LIB="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" \
-    && STDLIB="$(python -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')" \
-    && python -m compileall -q -j 0 --invalidation-mode=unchecked-hash -o 1 "$LIB" \
-    && python -m compileall -q -j 0 --invalidation-mode=unchecked-hash -o 1 "$STDLIB" \
-    && find "$LIB" -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
+# Copy installed packages from builder
+COPY --from=builder /root/.local /home/appuser/.local
+ENV PATH=/home/appuser/.local/bin:$PATH
 
-# Copy source and early logging helper
 COPY src ./src
-COPY sitecustomize.py ./
+COPY sitecustomize.py .
 
-# Compile everything and set permissions in one layer
-RUN python -m compileall -q -j 0 --invalidation-mode=unchecked-hash -o 1 /app/src /app/sitecustomize.py \
-    && mkdir -p logs data \
-    && chown -R appuser:appuser /app
+# Pre-compile for faster startup
+RUN python -m compileall -q /app/src
 
 USER appuser
+EXPOSE 8080
 
 CMD ["python", "-m", "src.main"]
