@@ -61,9 +61,15 @@ class MetricsRepository:
         feat_ref = self.daily_col.document(date_str).collection("features").document(sanitized_key)
 
         async def _tx(tx) -> None:
-            # Begin transaction by using the transaction-bound get
-            snap = await tx.get(feat_ref)
-            current = int(snap.get("count")) if getattr(snap, "exists", False) and snap.get("count") is not None else 0
+            # Begin transaction by using the client.get_all manually with the transaction object.
+            # This works around a bug in google-cloud-firestore v2.22+ where tx.get()
+            # incorrectly awaits an async generator returned by get_all().
+            snap = None
+            async for s in self.db.client.get_all([feat_ref], transaction=tx):
+                snap = s
+                break
+
+            current = int(snap.get("count")) if snap and snap.exists and snap.get("count") is not None else 0
             tx.set(feat_ref, {"count": current + int(by)}, merge=False)
 
         await self.db.run_transaction(_tx)
