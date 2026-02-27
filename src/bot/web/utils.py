@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import pydantic
-from fastapi import Form, HTTPException
+from fastapi import UploadFile
 
 from ...container import container
 from ...services.calendar_service import CalendarService
@@ -59,23 +61,6 @@ class BookingView(pydantic.BaseModel):
     def list_from_raw(cls, items: list[dict] | None) -> list["BookingView"]:
         return [cls.from_raw(b or {}) for b in (items or [])]
 
-class LocationCreate(pydantic.BaseModel):
-    name: str
-
-    @pydantic.field_validator("name")
-    @classmethod
-    def _strip_and_require(cls, v: str) -> str:
-        v = (v or "").strip()
-        if not v:
-            raise ValueError("name must be non-empty")
-        return v
-
-def location_form(name: str = Form(...)) -> "LocationCreate":
-    try:
-        return LocationCreate(name=name)
-    except pydantic.ValidationError as e:
-        raise HTTPException(status_code=422, detail=e.errors())
-
 def parse_title_code_lines(text: str) -> list[dict]:
     items: list[dict] = []
     for line in str(text).splitlines():
@@ -91,6 +76,29 @@ def parse_title_code_lines(text: str) -> list[dict]:
         if title and code:
             items.append({"title": title, "code": code})
     return items
+
+async def save_upload(
+    file_field: UploadFile,
+    dst_dir: Path,
+    allowed_exts: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp"),
+) -> str | None:
+    if not file_field or not file_field.filename:
+        return None
+    ext = Path(file_field.filename).suffix.lower()
+    if ext not in allowed_exts:
+        ext = ".jpg"
+    
+    name = f"{secrets.token_hex(8)}{ext}"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    path = dst_dir / name
+    
+    try:
+        content = await file_field.read()
+        path.write_bytes(content)
+        return name
+    except Exception:
+        logger.exception("Failed to save upload")
+        return None
 
 async def compute_new_bookings_today(
     bookings: Optional[list[dict]] = None,

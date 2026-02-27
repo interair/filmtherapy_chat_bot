@@ -205,7 +205,7 @@ class CalendarService:
     ) -> List[Slot]:
         # Build slots from recurrent schedule rules (from Firestore), avoid full bookings reload
         # Parallelize fetching rules and busy intervals
-        rules_task = self._schedule_repo.get()
+        rules_task = self._schedule_repo.get_all()
         busy_task = self._day_busy_intervals(date)
 
         rules, busy_intervals = await asyncio.gather(rules_task, busy_task)

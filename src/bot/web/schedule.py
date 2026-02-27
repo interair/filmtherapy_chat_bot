@@ -16,9 +16,17 @@ async def web_schedule(
     loc_repo: LocationRepository = Depends(get_location_service),
     flags: QueryFlags = Depends()
 ):
-    rules = await sched_repo.list_all()
-    locs = await loc_repo.list_all()
-    return render(request, "schedule.html", {"rules": rules, "locations": locs}, flags=flags)
+    from ...services.models import SessionType
+    rules = await sched_repo.get_all()
+    models = await loc_repo.get_all()
+    locs = [l.name for l in models]
+    stypes = [t.value for t in SessionType]
+    
+    return render(request, "schedule.html", {
+        "rules": rules, 
+        "locations": locs, 
+        "session_types": stypes
+    }, flags=flags)
 
 @router.post("/save")
 async def web_schedule_save(
@@ -27,40 +35,31 @@ async def web_schedule_save(
 ):
     form = await request.form()
     
-    def _list(key: str) -> list[str]:
-        vals = form.getlist(key)
-        return [str(v).strip() for v in vals if str(v).strip()]
-
-    # Minimal implementation of the complex logic in webapp.py
-    # Re-using the same logic for consistency
-    rules_data = []
-    # This part usually involves parsing a dynamic form, 
-    # for now I'll just refer to the original implementation if needed or 
-    # just implement the core saving logic.
-    
-    # Actually, I should copy the logic from webapp.py to ensure it works the same.
-    # [Logic truncated for brevity in thoughts, will implement fully in the file]
-    
-    # [Implementing the full logic from webapp.py lines 590-661]
-    raw_dates = _list("date[]")
-    raw_starts = _list("start[]")
-    raw_ends = _list("end[]")
-    raw_locs = _list("location_id[]")
-    raw_names = _list("name[]")
-    raw_prices = _list("price[]")
-    raw_dels = _list("delete[]")
+    # Extract lists from form
+    ids = form.getlist("id")
+    dates = form.getlist("date")
+    starts = form.getlist("start")
+    ends = form.getlist("end")
+    durations = form.getlist("duration")
+    intervals = form.getlist("interval")
+    locations = form.getlist("location")
+    session_types = form.getlist("session_type")
+    deleteds = form.getlist("deleted")
     
     new_rules = []
-    for i in range(len(raw_dates)):
-        if i < len(raw_dels) and raw_dels[i] == "1":
-            continue
+    # All fields should have same length, but we use dates as primary driver
+    for i in range(len(dates)):
+        # Construct rule dict; ScheduleRule.model_validate handles conversion
         rule = {
-            "date": raw_dates[i],
-            "start": raw_starts[i] if i < len(raw_starts) else "",
-            "end": raw_ends[i] if i < len(raw_ends) else "",
-            "location_id": raw_locs[i] if i < len(raw_locs) else "",
-            "name": raw_names[i] if i < len(raw_names) else "",
-            "price": raw_prices[i] if i < len(raw_prices) else "",
+            "id": str(ids[i]) if i < len(ids) and ids[i] else None,
+            "date": str(dates[i]),
+            "start": str(starts[i]) if i < len(starts) else "",
+            "end": str(ends[i]) if i < len(ends) else "",
+            "duration": int(durations[i]) if i < len(durations) and durations[i] else 50,
+            "interval": int(intervals[i]) if i < len(intervals) and intervals[i] else None,
+            "location": str(locations[i]) if i < len(locations) else "",
+            "session_type": str(session_types[i]) if i < len(session_types) else "",
+            "deleted": deleteds[i] == "1" if i < len(deleteds) else False,
         }
         new_rules.append(rule)
         

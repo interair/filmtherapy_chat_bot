@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File
 from fastapi.responses import RedirectResponse
@@ -9,34 +8,11 @@ from fastapi.responses import RedirectResponse
 from ...services.repositories import AboutRepository
 from ..dependencies import verify_web_auth, get_about_repository
 from .common import render, QueryFlags
+from .utils import save_upload
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/about", tags=["about"], dependencies=[Depends(verify_web_auth)])
-
-async def save_upload(
-    file_field: UploadFile,
-    dst_dir: Path,
-    allowed_exts: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp"),
-) -> str | None:
-    if not file_field or not file_field.filename:
-        return None
-    ext = Path(file_field.filename).suffix.lower()
-    if ext not in allowed_exts:
-        ext = ".jpg"
-    
-    import secrets
-    name = f"{secrets.token_hex(8)}{ext}"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    path = dst_dir / name
-    
-    try:
-        content = await file_field.read()
-        path.write_bytes(content)
-        return name
-    except Exception:
-        logger.exception("Failed to save upload")
-        return None
 
 @router.get("")
 async def web_about(

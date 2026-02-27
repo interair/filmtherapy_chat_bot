@@ -89,7 +89,7 @@ async def test_save_and_get_roundtrip_sorted(fake_firestore):
     r2 = make_rule("01-01-30", "09:00", "11:00", duration=45, interval=15, location="LocB", session_type="")
 
     # Save two rules
-    await repo.save([r1, r2])
+    await repo.save_all([r1, r2])
 
     # Underlying store should have two docs with ids as in rules
     col = fake_firestore.collection("schedule")
@@ -103,7 +103,7 @@ async def test_save_and_get_roundtrip_sorted(fake_firestore):
         assert isinstance(payload.get("date"), str)
 
     # Read back and verify sorting by (date, start)
-    out = await repo.get()
+    out = await repo.get_all()
     assert [x.id for x in out] == [r2.id, r1.id]
 
 
@@ -112,17 +112,17 @@ async def test_save_deletes_only_when_explicit(fake_firestore):
     repo = ScheduleRepository()
     r1 = make_rule("02-01-30", "10:00", "12:00")
     r2 = make_rule("02-01-30", "13:00", "15:00")
-    await repo.save([r1, r2])
+    await repo.save_all([r1, r2])
 
     # Saving only a subset should NOT delete others anymore
-    await repo.save([r2])
+    await repo.save_all([r2])
     col = fake_firestore.collection("schedule")
     assert set(col._store.keys()) == {r1.id, r2.id}
 
     # Now delete r1 explicitly using the deleted flag
     r1_deleted = make_rule("02-01-30", "10:00", "12:00")
     r1_deleted.deleted = True
-    await repo.save([r1_deleted])
+    await repo.save_all([r1_deleted])
     assert set(col._store.keys()) == {r2.id}
 
 
@@ -134,7 +134,7 @@ async def test_save_deduplicates_by_doc_id_last_wins(fake_firestore):
     b = make_rule("03-01-30", "10:00", "12:00", duration=60, location="Room1", session_type="Очно")
     assert a.id == b.id  # sanity: composite keys match
 
-    await repo.save([a, b])
+    await repo.save_all([a, b])
 
     col = fake_firestore.collection("schedule")
     assert set(col._store.keys()) == {a.id}
@@ -148,7 +148,7 @@ async def test_save_ignores_invalid_items(fake_firestore):
     repo = ScheduleRepository()
     valid = make_rule("04-01-30", "10:00", "11:00")
     # Include non-rule garbage; repository should ignore invalid items without raising
-    await repo.save([valid, "oops", 123])  # type: ignore[list-item]
+    await repo.save_all([valid, "oops", 123])  # type: ignore[list-item]
 
     col = fake_firestore.collection("schedule")
     assert set(col._store.keys()) == {valid.id}

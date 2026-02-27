@@ -333,10 +333,10 @@ class AboutRepository:
         snap = await self._doc.get()
         return snap.to_dict() or {}
 
-    async def get(self) -> Dict[str, Any]:
+    async def get_config(self) -> Dict[str, Any]:
         return await self._get_document_data()
 
-    async def save(self, data: Dict[str, Any]) -> None:
+    async def update_config(self, data: Dict[str, Any]) -> None:
         if not isinstance(data, dict):
             data = {}
         # Do not store actual files in Firestore, only metadata (e.g., filename)
@@ -379,7 +379,7 @@ class AboutRepository:
             items.append(filename)
         await self._doc.set({"cinema_photos": items}, merge=True)
 
-    async def delete_cinema_photo(self, filename: str) -> None:
+    async def remove_cinema_photo(self, filename: str) -> None:
         data = await self._get_document_data()
         items = data.get("cinema_photos")
         if not isinstance(items, list):
@@ -456,10 +456,10 @@ class ScheduleRepository:
         for doc_id, r in upserts.items():
             await self._col.document(doc_id).set(r.model_dump(mode="python", exclude={"id", "deleted"}), merge=False)
 
-    async def get(self) -> List[ScheduleRule]:
+    async def get_all(self) -> List[ScheduleRule]:
         return await self._fetch_rules()
 
-    async def save(self, rules_in: List[ScheduleRule]) -> None:
+    async def save_all(self, rules_in: List[ScheduleRule]) -> None:
         await self._persist_rules(rules_in)
 
     # Optional typed API for future usage

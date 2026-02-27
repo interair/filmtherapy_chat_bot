@@ -28,5 +28,5 @@ async def web_bookings_delete(
     form = await request.form()
     booking_id = str(form.get("id", ""))
     if booking_id:
-        await calendar_service.delete_booking(booking_id)
+        await calendar_service.admin_delete_booking(booking_id)
     return RedirectResponse(url="/bookings?deleted=1", status_code=303)

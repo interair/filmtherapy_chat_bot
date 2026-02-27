@@ -104,7 +104,7 @@ class FakeScheduleRepo:
     def __init__(self, rules: list[dict] | None = None):
         self.rules = rules or []
 
-    async def get(self):
+    async def get_all(self):
         # CalendarService now expects a typed list of ScheduleRule
         from src.services.models import ScheduleRule
         out: list[ScheduleRule] = []

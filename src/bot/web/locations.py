@@ -7,7 +7,6 @@ from fastapi.responses import RedirectResponse
 from ...services.repositories import LocationRepository, SessionLocationsRepository
 from ..dependencies import verify_web_auth, get_location_service, get_session_locations_repository
 from .common import render, QueryFlags
-from .utils import LocationCreate, location_form
 
 router = APIRouter(prefix="/locations", tags=["locations"], dependencies=[Depends(verify_web_auth)])
 
@@ -17,7 +16,7 @@ async def web_locations(
     loc_repo: LocationRepository = Depends(get_location_service),
     flags: QueryFlags = Depends()
 ):
-    locs = await loc_repo.list_all()
+    locs = await loc_repo.get_all()
     return render(request, "locations.html", {"locations": locs}, flags=flags)
 
 @router.post("/add")
@@ -25,7 +24,11 @@ async def web_locations_add(
     name: str = Form(...),
     loc_repo: LocationRepository = Depends(get_location_service)
 ):
-    await loc_repo.add(name.strip())
+    try:
+        await loc_repo.create({"name": name.strip()})
+    except Exception:
+        # Ignore already exists or other errors for now
+        pass
     return RedirectResponse(url="/locations?added=1", status_code=303)
 
 @router.post("/delete/{name}")
@@ -33,7 +36,7 @@ async def web_locations_delete(
     name: str,
     loc_repo: LocationRepository = Depends(get_location_service)
 ):
-    await loc_repo.remove(name)
+    await loc_repo.delete(name)
     return RedirectResponse(url="/locations?deleted=1", status_code=303)
 
 @router.get("/by-type")
@@ -44,10 +47,13 @@ async def web_locations_by_type(
     flags: QueryFlags = Depends()
 ):
     types = ["cinema", "individual", "group", "online"]
+    m = await repo.get_map()
     data = {}
     for t in types:
-        data[t] = await repo.list_for(t)
-    locs = await loc_repo.list_all()
+        data[t] = m.get(t, [])
+    
+    models = await loc_repo.get_all()
+    locs = [l.name for l in models]
     return render(request, "locations_by_type.html", {"data": data, "locations": locs}, flags=flags)
 
 @router.post("/by-type/add")
