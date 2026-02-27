@@ -49,7 +49,12 @@ async def web_events_edit(
     if ev and ev.when:
         when_value = ev.when.strftime("%Y-%m-%dT%H:%M")
         
-    return render(request, "events_edit.html", {"event": ev, "locs": locs, "when_value": when_value})
+    return render(request, "events_edit.html", {
+        "event": ev,
+        "photo": ev.photo if ev else None,
+        "locs": locs, 
+        "when_value": when_value
+    })
 
 @router.post("/save")
 async def web_events_save(
