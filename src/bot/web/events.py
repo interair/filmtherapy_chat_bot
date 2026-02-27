@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Request, UploadFile
+from fastapi import APIRouter, Depends, Request, UploadFile, File
 from fastapi.responses import RedirectResponse
 
 from ...services.repositories import LocationRepository, EventRepository
@@ -59,18 +59,19 @@ async def web_events_edit(
 @router.post("/save")
 async def web_events_save(
     request: Request,
+    photo: UploadFile = File(None),
     event_repo: EventRepository = Depends(get_event_repository)
 ):
     form = await request.form()
     event_id = str(form.get("id", "")).strip()
     
     # Handle photo upload
-    photo_file = form.get("photo")
     photo_name = None
-    if isinstance(photo_file, UploadFile) and photo_file.filename:
+    if photo and photo.filename:
         from .common import ROOT_DIR
+        # Use src/data/ for uploads as it is mounted to /static
         dst = ROOT_DIR / "data"
-        photo_name = await save_upload(photo_file, dst)
+        photo_name = await save_upload(photo, dst)
 
     data = {
         "title": str(form.get("title", "")).strip(),
@@ -95,6 +96,8 @@ async def web_events_save(
         else:
             import secrets
             data["id"] = secrets.token_hex(4)
+            # Create the event with the photo field (if present)
+            logger.info("Creating new event with data: %s", data)
             await event_repo.create(data)
             return RedirectResponse(url="/events?created=1", status_code=303)
     except Exception as e:

@@ -94,10 +94,11 @@ async def save_upload(
     
     try:
         content = await file_field.read()
+        logger.info("save_upload: saving %d bytes to %s", len(content), path)
         path.write_bytes(content)
         return name
     except Exception:
-        logger.exception("Failed to save upload")
+        logger.exception("Failed to save upload to %s", path)
         return None
 
 async def compute_new_bookings_today(
